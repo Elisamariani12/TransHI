@@ -36,14 +36,14 @@ It can be observed that the best iteration of TransHI outperforms TransE and Tra
 
 ### TransHI - Instructions
 
-Le istruzioni per runnare la pipeline prevista da TransHI sono presentate. In particolare, i codici relativi sono nella cartella MODELS e sono divisi nelle tre fasi principali della pipeline: PREPROCESSING, TRAINING, TRAINING_DATA_UPDATE.
+Instructions for executing the TransHI pipeline are provided. Specifically, the relevant codes are located in the MODELS folder and are divided into the three main phases of the pipeline: PREPROCESSING, TRAINING, and TRAINING_DATA_UPDATE.
 
-Nelle cartelle relative ai 3 KGs (DBPEDIA15K, YAGO, NELL) si trovano i file particolari per ogni KG. Prima di iniziare la pipeline si decide di utilizzare un KG in particolare, tutti gli step utilizzeranno files contenuti nella relativa al KG scelto.
+Within the folders dedicated to the 3 KGs (DBPEDIA15K, YAGO, NELL), one can find specific files tailored for each KG. Before initiating the pipeline, one must choose a particular KG; all subsequent steps will utilize files contained within the chosen KG's folder.
 
-Nell'algoritmo di training, le triple non si utilizzano come stirnghe ma con sequenze di 3 numeri, creati assegnando ad ogni entità ed ogni relazione un numero identificativo. Si trovano per tanto passaggi per rimuovere/togliere gli IDs relativi dai file oppure per convertire da TTL (notazione con stringhe) alla rappresentazione di triple con gli IDs.
+In the training algorithm, triples are not employed as strings but rather as sequences of three numbers, created by assigning an identifying number to each entity and relation. Therefore, there are steps included to remove/strip the relevant IDs from the files or to convert from TTL notation (using strings) to the representation of triples with the IDs.
 
 **PREPROCESSING - Instructions**
-I primi due step di questa fase fanno utilizzo di un reasoner ontologico, Hermit (http://www.hermit-reasoner.com/java.html) per lavorare con ontologie. I due JARS relativi a tale reasoner utilizzati in TransHI sono presenti nella cartella 'MODELS/PREPROCESSING/". Per utilizzare esattamente i comandi sottostanti si devono mettere i JARS nella stessa cartella in cui sono presenti i programmi da runnare.
+The initial two steps of this phase utilize an ontological reasoner, Hermit (http://www.hermit-reasoner.com/java.html), to work with ontologies. The two JAR files related to this reasoner, as used in TransHI, can be found in the 'MODELS/PREPROCESSING/' directory. To execute the commands provided below accurately, one should place the JAR files in the same directory where the programs to be run are located.
 
 1. Inconsistencies correction
    - Remove IDs from files "train2id", "test2id" e "valid2id". These files are from the authors of TransOWL (https://github.com/Keehl-Mihael/TransROWL-HRS) and are used to keep the same division train/test/valid as them. This step removes the numerical IDs from those files producing three files: "train.txt","test.txt","valid.txt".
