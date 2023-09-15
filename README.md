@@ -34,7 +34,7 @@ In the table below, the performance of TransHI is compared to that of TransOWL, 
 
 It can be observed that the best iteration of TransHI outperforms TransE and TransOWL for the considered datasets: DBPEDIA15K, YAGO, and NELL. Alongside the final result of TransHI (that of the best performance), one can also view, for comparison, the outcomes of TransE and TransOWL using preprocessed data (with preprocessing provided by TransHI). Additionally, the results from the individual use of negative triples generated based on structure and those based on ontology are displayed, as well as the outcomes of TransHI after just a single iteration.
 
-### TransHI - Instruction
+### TransHI - Instructions
 
 Le istruzioni per runnare la pipeline prevista da TransHI sono presentate. In particolare, i codici relativi sono nella cartella MODELS e sono divisi nelle tre fasi principali della pipeline: PREPROCESSING, TRAINING, TRAINING_DATA_UPDATE.
 
@@ -47,22 +47,33 @@ I primi due step di questa fase fanno utilizzo di un reasoner ontologico, Hermit
 
 1. Inconsistencies correction
 1.1. Remove IDs from files "train2id", "test2id" e "valid2id". These files are from the authors of TransOWL (https://github.com/Keehl-Mihael/TransROWL-HRS) and are used to keep the same division train/test/valid as them. This step removes the numerical IDs from those files producing three files: "train.txt","test.txt","valid.txt".
+   
    `javac Triple.java`
+   
    `javac Triple_Integer.java`
+   
    `javac IDtoTTLconverter.java`
+   
    `java IDtoTTLconverter "/path_to_train2id/" "train2id.txt"`
+   
     `java IDtoTTLconverter "/path_to_test2id/" "test2id.txt"`
+   
     `java IDtoTTLconverter "/path_to_valid2id/" "valid2id.txt"`
+   
 1.2. Remove Inconsitencies - The file "complete_graph" has to be in the same folder as the files "train.txt","test.txt","valid.txt". This step clean the complete graph from the inconsistencies and then split the triples based on the division done by the authors of TransOWL (https://github.com/Keehl-Mihael/TransROWL-HRS). The files with the consistent triples produced are: "train2id_Consistent.txt", "test2id_Consistent.txt", "valid2id_Consistent.txt".
+
    `javac -cp ./:./org.semanticweb.HermiT.jar:./HermiT.jar InconsistencyCorrection.java`
+   
    `java -cp ./:./org.semanticweb.HermiT.jar:./HermiT.jar InconsistencyCorrection "/path_to_ontology_file_complete_graph/" "/path_to_ontology/ontology_file.ttl"`
 
-2. Ontology Axioms Entailment - In this step, the files "relation2id" and "entity2id" containing all the entities and relationships of the KG. This step does the entailment of ontological axioms and store the axioms explicitely contained in the KG and the ones entailed in files: "SuperClasses_axioms.txt", "SubClasses_axioms.txt", "SuperProperties_axioms.txt", ... .
+3. Ontology Axioms Entailment - In this step, the files "relation2id" and "entity2id" containing all the entities and relationships of the KG. This step does the entailment of ontological axioms and store the axioms explicitely contained in the KG and the ones entailed in files: "SuperClasses_axioms.txt", "SubClasses_axioms.txt", "SuperProperties_axioms.txt", ... .
    `javac -cp ./:./org.semanticweb.HermiT.jar:./HermiT.jar Axiom_entailment.java`
+   
  `java -cp ./:./org.semanticweb.HermiT.jar:./HermiT.jar Axiom_entailment "/path_to_files_entity2id_and_relation2id/" "/path_to_ontology/ontology_file.ttl"`
 
-3. Positive Triples Augmentation -  "path_to_axioms" è il percorso per i files creati nello step precedente: "SuperClasses_axioms.txt", "SubClasses_axioms.txt", "SuperProperties_axioms.txt", ... . The file containing the train triples augmented with the newly created ones is "train2id_Consistent_withAugmentation.txt". 
+5. Positive Triples Augmentation -  "path_to_axioms" è il percorso per i files creati nello step precedente: "SuperClasses_axioms.txt", "SubClasses_axioms.txt", "SuperProperties_axioms.txt", ... . The file containing the train triples augmented with the newly created ones is "train2id_Consistent_withAugmentation.txt". 
    `javac PositiveTripleAugmentation.java`
+   
  `java PositiveTripleAugmentation "/path_to_axioms/" "/path_to_train2id_consistent/" "/path_to_relation2id/"`
 
-5. 
+7. 
