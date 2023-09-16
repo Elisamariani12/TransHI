@@ -38,9 +38,8 @@ The results for these experiments were obtained choosing the best percentage of 
 - learning rate: 0.001
 - epochs: 1000
 - embedding dimension: 100
-- margin: 1
+- margin: 1 
 
-  
 Two additional parameters, associated with the training employed by TransHI, pertain to the process of identifying entity
 neighbors. A choice of k = 3 hops was made, and varying numbers of random walks were used
 for the three KGs:
