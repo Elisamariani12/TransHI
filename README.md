@@ -57,11 +57,12 @@ Within the folders dedicated to the 3 KGs (DBPEDIA15K, YAGO, NELL), one can find
 In the training algorithm, triples are not employed as strings but rather as sequences of three numbers, created by assigning an identifying number to each entity and relation. Therefore, there are steps included to remove/strip the relevant IDs from the files or to convert from TTL notation (using strings) to the representation of triples with the IDs.
 
 **PREPROCESSING - Instructions**
+
 The initial two steps of this phase utilize an ontological reasoner, Hermit (http://www.hermit-reasoner.com/java.html), to work with ontologies. The two JAR files related to this reasoner, as used in TransHI, can be found in the 'MODELS/PREPROCESSING/' directory. To execute the commands provided below accurately, one should place the JAR files in the same directory where the programs to be run are located.
 
 1. Inconsistencies correction
    
-   - Remove IDs from files "train2id", "test2id" e "valid2id". These files are from the authors of TransOWL (https://github.com/Keehl-Mihael/TransROWL-HRS) and are used to keep the same division train/test/valid as them. This step removes the numerical IDs from those files producing three files: "train.txt","test.txt","valid.txt".
+- Remove IDs from files "train2id", "test2id" e "valid2id". These files are from the authors of TransOWL (https://github.com/Keehl-Mihael/TransROWL-HRS) and are used to keep the same division train/test/valid as them. This step removes the numerical IDs from those files producing three files: "train.txt","test.txt","valid.txt".
    ```basg
    javac Triple.java
    
@@ -141,7 +142,8 @@ python3 triple_classification.py "_10_onlyS" "/path_to_files/" "1"
  <small>*N.B. In this example the embeddings used for classification are created with 10% of the negatives using only the structure and the iteration is the first one.*</small>
  
 **TRAINING NEXT ITERATIONS - Instructions**
-The first parameter indicates the current iteration number. The second parameter, "percentage_negatives_generated" should be set at 100 because in the iterations following the first one all the misclassified triples are to be used. All input files must reside in the same directory ("path_to_files"), "path_to_files", and these files include: relation2id.txt, entity2id.txt, train2id_Consistent_withAugmentation.txt, inconsistent_wrongly_classified.txt and the files of the embeddings created in the previous training. The parameter "note" used in the previous training has to be used as parameter "old_note". Instead, the parameter "note" should have another label to identify the new embeddings created.
+
+7. Training algorithm -next iterations - The first parameter indicates the current iteration number. The second parameter, "percentage_negatives_generated" should be set at 100 because in the iterations following the first one all the misclassified triples are to be used. All input files must reside in the same directory ("path_to_files"), "path_to_files", and these files include: relation2id.txt, entity2id.txt, train2id_Consistent_withAugmentation.txt, inconsistent_wrongly_classified.txt and the files of the embeddings created in the previous training. The parameter "note" used in the previous training has to be used as parameter "old_note". Instead, the parameter "note" should have another label to identify the new embeddings created.
   ```bash
   ./TransHI.exe -number_iteration 2 -percentage_negatives_generated 100 -input ~/path_to_files/ -output ~/path_to_files/ -old_note "_10_onlyS" -note "_10_onlyS_2iter"
    ```
@@ -149,6 +151,7 @@ The first parameter indicates the current iteration number. The second parameter
 After the training of the iterations following the first one, another classification can follow and then another training step, in an iterative way. The pipeline stops when the file "inconsistent_wrongly_classified.txt" is empty or there are no more files "InconsistentTriples_***.txt" to use (each of them has to be used just once).
 
 **LINK PREDICTION - Instructions**
+
 The embeddings created in each iteration are evaluated by their performance on a link prediction task. The prediction performance can be separated between the performance in predicting "typeOf" links (the prediction of triples that have 'type' as relation) and the performance on "noTypeOf" links (the prediction of triples that do not have 'type' as relation). In the folder "path_to_embedding" there have to be the embeddings to be evaluated: the files entity2vec and relation2vec  followed by the string indicated in "note" that identify the settings of creation of the embeddings. 
 
 For general performance: 
