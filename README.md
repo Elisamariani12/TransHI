@@ -60,6 +60,7 @@ In the training algorithm, triples are not employed as strings but rather as seq
 The initial two steps of this phase utilize an ontological reasoner, Hermit (http://www.hermit-reasoner.com/java.html), to work with ontologies. The two JAR files related to this reasoner, as used in TransHI, can be found in the 'MODELS/PREPROCESSING/' directory. To execute the commands provided below accurately, one should place the JAR files in the same directory where the programs to be run are located.
 
 1. Inconsistencies correction
+   
    - Remove IDs from files "train2id", "test2id" e "valid2id". These files are from the authors of TransOWL (https://github.com/Keehl-Mihael/TransROWL-HRS) and are used to keep the same division train/test/valid as them. This step removes the numerical IDs from those files producing three files: "train.txt","test.txt","valid.txt".
    ```basg
    javac Triple.java
@@ -79,7 +80,18 @@ The initial two steps of this phase utilize an ontological reasoner, Hermit (htt
    javac -cp ./:./org.semanticweb.HermiT.jar:./HermiT.jar InconsistencyCorrection.java
    java -cp ./:./org.semanticweb.HermiT.jar:./HermiT.jar InconsistencyCorrection "/path_to_ontology_file_complete_graph/" "/path_to_ontology/ontology_file.ttl"
 ```
-- Reput IDs instead of the string triples in 
+- Reput IDs instead of the string triples in "consistent_triples_train.txt", "consistent_triples_test.txt", "consistent_triples_valid.txt" (contained in the folder with the path "path_to_files"). The files produced are : "train2id_Consistent.txt", "test2id_Consistent.txt", "valid2id_Consistent.txt".
+```bash
+   javac TTLtoIDconverter.java
+   
+   java TTLtoIDconverter "/path_to_files/" "consistent_triples_train.txt"
+   
+    java TTLtoIDconverter "/path_to_files/" "consistent_triples_test.txt"
+   
+    java TTLtoIDconverter "/path_to_files/" "consistent_triples_valid.txt"
+ ```
+
+  
 2. Ontology Axioms Entailment - In this step, the files "relation2id" and "entity2id" containing all the entities and relationships of the KG have to be in the same folder . This step does the entailment of ontological axioms and store the axioms explicitely contained in the KG and the ones entailed in files: "SuperClasses_axioms.txt", "SubClasses_axioms.txt", "SuperProperties_axioms.txt", ... .
    ```bash
    javac -cp ./:./org.semanticweb.HermiT.jar:./HermiT.jar Axiom_entailment.java
@@ -93,7 +105,8 @@ javac PositiveTripleAugmentation.java
 
 **TRAINING - Instructions**
 
-4. Training algorithm
+4. Training algorithm -first iteration
+   
 - CC generation - The CC for each entity of the is saved in the file "CCs.tx".
  ```bash
 javac CC_Generator.java
@@ -114,6 +127,7 @@ javac NeighborsGenerator.java
   
 
 **TRAINING DATA UPDATE - Instructions**
+
 5. Inconsistent Triples Generation - this step creates files of inconsistent triples "InconsistentTriples_1", "InconsistentTriples_2", ... . It creates as many files with inconsistent triples as possible. Each one of these files is supposed to be used in one of the subsequent iterations, therefore this code can be ran just 1 time and it will automatically produce files for all the possible iterations. The folder indicated in the parameter "input" is supposed to contain the files: relation2id.txt, entity2id.txt, train2id_Consistent_withAugmentation.txt, DisjointWith_axioms.txt, Domain_axioms.txt, Range_axioms.txt, SuperClasses_axioms.txt, IrreflexiveProperties_axioms.txt, AsymmetricProperties_axioms.txt.
   ```bash
 g++ -std=c++11 InconsistentTriplesGenerator.cpp -o InconsistentTriplesGenerator.exe 
