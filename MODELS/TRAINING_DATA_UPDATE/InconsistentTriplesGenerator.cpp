@@ -30,23 +30,20 @@ using namespace std;
 
 const REAL pi = 3.141592653589793238462643383;
 
-//---------------CHOOSE THE HEURISTIC -----------------------------------------
-//  1- SANS (random)
-//	2- SANS + highest CC
-//  3- SANS + DEGREE
-//  4- SANS + JACCARD
 
 INT typeOf_ID;
-INT number_negatives_per_positive=1000;
+INT number_negatives_per_positive=1000; 	//because of the standard 1000 epochs of training
 INT number_creation=0;
 
 INT count_my_negatives=-1;
 
+//PATH/NOTE initialized to ""
 string inPath = "";
 string outPath = "";
 
 std::ofstream outputFile;
 
+//structure to save a triple
 struct Triple {
 	INT h, r, t;
 };
@@ -56,8 +53,8 @@ struct Edge {
   int relation;
 };
 
+//structures to save training data
 Triple  *trainList,*negativesList;
-
 
 //NEEDED TO HANDLE THE ONTOLOGY-BASED NEGATIVES GENERATION
 std::map<int, std::vector<int>> mapDisjointClasses;
@@ -78,7 +75,7 @@ vector<int> testineT_ontology;
 vector<int> testineH_ontology;
 vector<bool> entity_w_class;
 
-
+//3D matrix to store all the negatives create (to not repeat them) and the training data (to not use them as negatives)
 typedef std::unordered_map<int, bool> InnerMap;
 typedef std::unordered_map<int, InnerMap> MiddleMap;
 typedef std::unordered_map<int, MiddleMap> OuterMap;
@@ -107,16 +104,17 @@ Sparse3DMatrix adjacencyList_all_trainTriples;
 
 
 
+//numbers of relations,entity, train triples
+INT relationTotal, entityTotal, tripleTotal;
 /*
-	Read triples from the training file.
+	function to add negatives/training triples to the 3d matrix
 */
-
-INT relationTotal, entityTotal, tripleTotal, negativesTotal;
-
 void addEdge(int from, int relation, int to) {
 		adjacencyList_all_trainTriples.set(from,to,relation);
 }
-
+/*
+	scanning the train triples, fill two maps: one that link every class to its entities and one that maps every entity to its classes
+*/
 void fillMapsOfClassesAndEntities(){
 	for(int i=0;i<tripleTotal;i++){
 		if(trainList[i].r==typeOf_ID){
@@ -132,6 +130,9 @@ void fillMapsOfClassesAndEntities(){
 		}
 	}
 }
+/*
+	add superclasses in the domain because of the entailed axiom: p-domain->x,x-subclass->y implies p-domain->y
+*/
 void AddSuperClassesForGenericity_domain(){
 	for(const auto& myentry:mapDomains){
         vector<int> my_super_classes;
@@ -149,6 +150,9 @@ void AddSuperClassesForGenericity_domain(){
         }			
 	}
 }
+/*
+	add superclasses in the range because of the entailed axiom: p-range->x,x-subclass->y implies p-range->y
+*/
 void AddSuperClassesForGenericity_range(){
 	for(const auto& myentry:mapRanges){
 
@@ -170,6 +174,9 @@ void AddSuperClassesForGenericity_range(){
         }		
 	}
 }
+/*
+	create map of classes that are not admitted as the domain of each property
+*/
 void CreateMapNotAdmitted_domain(){
 	for(const auto& entry:mapDomains){
 		vector<int> my_domain_classes=entry.second;
@@ -180,7 +187,9 @@ void CreateMapNotAdmitted_domain(){
    		}
 	}
 }
-
+/*
+	create map of classes that are not admitted as the range of each property
+*/
 void CreateMapNotAdmitted_range(){
 	for(const auto& entry:mapRanges){
 		vector<int> my_range_classes=entry.second;
@@ -191,7 +200,9 @@ void CreateMapNotAdmitted_range(){
    		}
 	}
 }
-
+/*
+	shuffle randomly the vectors in a map<int,vector<int>>
+*/
 void shuffleVectorsInMap(std::map<int, std::vector<int>>& myMap) {
     int myseed = 12345;
 
@@ -200,9 +211,12 @@ void shuffleVectorsInMap(std::map<int, std::vector<int>>& myMap) {
         std::shuffle(pair.second.begin(), pair.second.end(), generator);
     }
 }
-
+/*
+	initialize the structures with the traintriples and with the axioms for ontology-based negatives
+*/
 void init() {
 	
+	// Retrieve the ID related to the 'type' relationship
 	FILE *fin;
 	INT tmp;
 	char buffer[1024]; 
@@ -218,10 +232,12 @@ void init() {
         }
     }
 	fclose(fin);
+	// initialize the embeddings of relations randomly
 
 	fin = fopen((inPath+"entity2id.txt").c_str(), "r");
 	tmp = fscanf(fin, "%d", &entityTotal);
 	fclose(fin);
+	//set up the structure with the training triples, also counting the frequence of entities and relations
 
 	fin = fopen((inPath+"train2id_Consistent_withAugmentation.txt").c_str(), "r");
 	tmp = fscanf(fin, "%d", &tripleTotal);
@@ -248,15 +264,7 @@ void init() {
 
 	
 	/*ADDITIONAL PART FOR LOADING THE INPUT FILES WITH THE ONTOLOGY AXIOMS NEEDED TO BUILD THE NEGATIVES --------------------------------*/
-	//std::map<int, std::vector<int>> mapDisjointClasses;
-	//std::map<int, std::vector<int>> mapDomains;
-	//std::map<int, std::vector<int>> mapRanges;
-	//std::map<int, std::vector<int>> mapClassesToEntities;
-	/*ADDITIONAL PART FOR LOADING THE INPUT FILES WITH THE ONTOLOGY AXIOMS NEEDED TO BUILD THE NEGATIVES --------------------------------*/
-	//std::map<int16_t, std::vector<int16_t>> mapDisjointClasses;
-	//std::map<int16_t, std::vector<int16_t>> mapDomains;
-	//std::map<int16_t, std::vector<int16_t>> mapRanges;
-	//std::map<int16_t, std::vector<int16_t>> mapClassesToEntities;
+		// load disjoint classes axioms
 	cout<<"loading Disjoint-classes file: ";
 	std::ifstream filedisj((inPath +"DisjointWith_axioms.txt").c_str());
     if (filedisj.is_open()) {
@@ -284,6 +292,7 @@ void init() {
 	shuffleVectorsInMap(mapDisjointClasses);
 	cout<<"done \n";
 
+	// load domain axioms
 	cout<<"loading Domain-axioms file: ";
 	std::ifstream filedom((inPath +"Domain_axioms.txt").c_str());
     if (filedom.is_open()) {
@@ -310,6 +319,7 @@ void init() {
 	}
 	shuffleVectorsInMap(mapDomains);
 	cout<<"done \n";
+	// load range axioms
 
 	cout<<"loading Range-axioms file: ";
 	std::ifstream filerange((inPath +"Range_axioms.txt").c_str());
@@ -337,6 +347,7 @@ void init() {
 	}
 	shuffleVectorsInMap(mapRanges);
 	cout<<"done \n";
+	// load superclasses axioms
 
 	cout<<"loading SuperClasses file: ";
 	std::ifstream fileSuperClasses((inPath +"SuperClasses_axioms.txt").c_str());
@@ -364,6 +375,7 @@ void init() {
 	}
 	shuffleVectorsInMap(mapSuperClasses);
 	cout<<"done \n";
+	// load irreflexive relations axioms
 
 	cout<<"loading irreflexive relations file: ";
 	irreflexive_proprerty_to_be_used.resize(tripleTotal,false);
@@ -381,7 +393,7 @@ void init() {
 	std::cerr << "Failed to open file: IrreflexiveProperties_axioms.txt" << std::endl;
 	}
 	cout<<"done \n";
-
+	// load asymmetric relations axioms
 	cout<<"loading asymmetric relations file: ";
 	asymmetric_property_to_be_used.resize(tripleTotal,false);
 	std::ifstream fileAsymmProp((inPath +"AsymmetricProperties_axioms.txt").c_str());
@@ -401,10 +413,15 @@ void init() {
 
 
 
-    /*Create a map of all the classes and the respective entities*/
+    //Create 2 maps: 1 map of all the classes and the respective entities & 1 viceversa
 	fillMapsOfClassesAndEntities();
+		//add superclasses in domain and range for entailed axioms
+
 	AddSuperClassesForGenericity_domain();
 	AddSuperClassesForGenericity_range();
+
+		//create a map with not admitted classes domain & range
+
     CreateMapNotAdmitted_domain();
 	CreateMapNotAdmitted_range();
 
@@ -455,9 +472,8 @@ void out() {
 
 
 void* create() {
-  //cout<<Batch / threads<<"\n";
   
-  /*Batch è il numero di triple in un batch*/
+  /*while there are new inconsistent triple in the file produced, keep creating them*/
   while(count_my_negatives!=0){
 		count_my_negatives=0;
 		number_creation++;
@@ -478,6 +494,9 @@ void* create() {
 		outputFile.close();
   	}
 }
+/*
+	function to retrieve main parameters
+*/
 
 int ArgPos(char *str, int argc, char **argv) {
 	int a;
@@ -514,7 +533,7 @@ int main(int argc, char **argv) {
 //-------------------------------------------------------------------------------------------------------------------
 //---------------------------- METHODS TO CREATE NEGATIVES ----------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-
+//from positive (x,p,y) create negative (entity of classes disjointed with y,p,y)
 Triple change_head_disjointWith(int idx_pos) {
     Triple myneg;
     myneg.h = -1;
@@ -527,9 +546,10 @@ Triple change_head_disjointWith(int idx_pos) {
     int t = trainList[idx_pos].t;
 
 	int tries=0;
-
+	//if the tail has disjointed classes
 	if (mapDisjointClasses.find(t) != mapDisjointClasses.end()) {
 			bool found;
+			//scan all the entities and for each one check that the negative that would be created with it 1)is not in the training set 2)has not already been created
 			do{
 				found=false;
 				int curr_entity_to_check=testineH_ontology[idx_pos];
@@ -545,15 +565,17 @@ Triple change_head_disjointWith(int idx_pos) {
 				}
 				testineH_ontology[idx_pos]++;
 			}while(found==false && testineH_ontology[idx_pos]<entityTotal);
+			//not found and can't try again for this positive triple
 			if(found==false)testineH_ontology[idx_pos]=INT16_MIN;
 		}
 		else{
+			//not found and can't try again for this positive triple
 			testineH_ontology[idx_pos]=INT16_MIN;
 		}
 
     return myneg;
 }
-
+//from positive (x,p,y) create negative (x,p,entity of classes disjointed with classes(x))
 Triple change_tail_disjointWith(int idx_pos){
 	Triple myneg;
 	myneg.h=-1;myneg.r=-1;myneg.t=-1;
@@ -567,7 +589,6 @@ Triple change_tail_disjointWith(int idx_pos){
 	//find all the classes of my head (if there are)
 	if(mapEntitiesToClasses.find(h)!=mapEntitiesToClasses.end()){
 		
-		//vector<int16_t> classes_head=mapEntitiesToClasses[h];
 
 		//for each class of the head, collect the classes that are disjointed with that one
 		set<int> classes_disjointed;
@@ -610,7 +631,7 @@ Triple change_tail_disjointWith(int idx_pos){
 	
 	return myneg;
 }
-
+//from positive (x,p,y) create negative (entity of classes not in the domain of p,p,y)
 Triple change_domain(int idx_pos){
 	Triple myneg;
 	myneg.h=-1;myneg.r=-1;myneg.t=-1;
@@ -621,10 +642,12 @@ Triple change_domain(int idx_pos){
 	int r=trainList[idx_pos].r;
 	int t=trainList[idx_pos].t;
 
+	//if the relation has domain classes
 	if(mapDomains.find(r)!=mapDomains.end()){
-
+			
 			std::vector<int> not_admitted_classes=mapNotAdmitted_domain[r];
 
+			//scan all the entities and for each one check that the negative that would be created with it 1)is not in the training set 2)has not already been created
 			bool found;
 			do{
 				found=false;
@@ -640,17 +663,19 @@ Triple change_domain(int idx_pos){
 					}
 				}
 				testineH_ontology[idx_pos]++;
-			}while(found==false && testineH_ontology[idx_pos]<entityTotal);	
+			}while(found==false && testineH_ontology[idx_pos]<entityTotal);
+		//not found and can't try again for this positive triple
 		if(found==false)testineH_ontology[idx_pos]=INT16_MIN;
 	}
 	else{
+		//not found and can't try again for this positive triple
 		testineH_ontology[idx_pos]=INT16_MIN;	
 	}
 
 
 	return myneg;
 }
-
+//from positive (x,p,y) create negative (x,p,entity of classes not in the range of p)
 Triple change_range(int idx_pos){
 	Triple myneg;
 	myneg.h=-1;myneg.r=-1;myneg.t=-1;
@@ -659,11 +684,13 @@ Triple change_range(int idx_pos){
 	int h=trainList[idx_pos].h;
 	int r=trainList[idx_pos].r;
 	int t=trainList[idx_pos].t;
-
+	
+	//if the relation has range classes
 	if(mapRanges.find(r)!=mapRanges.end()){
 		
 		std::vector<int> not_admitted_classes=mapNotAdmitted_range[r];
-
+		
+		//scan all the entities and for each one check that the negative that would be created with it 1)is not in the training set 2)has not already been created
 		bool found;
 		do{
 			found=false;
@@ -680,11 +707,12 @@ Triple change_range(int idx_pos){
 			}
 			testineT_ontology[idx_pos]++;
 		}while(found==false && testineT_ontology[idx_pos]<entityTotal);	
+		//not found and can't try again for this positive triple
 		if(found==false)testineT_ontology[idx_pos]=INT16_MIN;
-
 	}
 	
 	else{
+		//not found and can't try again for this positive triple
 		testineT_ontology[idx_pos]=INT16_MIN;
 	}
 	

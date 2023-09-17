@@ -4,17 +4,19 @@ import java.util.*;
 import static java.util.Collections.max;
 
 public class CC_Generator {
-    private static final String folder_path="C:/Users/elisa/Desktop/ToUpload_COLAB_FILES/allfilestoRun-NELL/"; //number of random walks of K steps
+    private static String folder_path; //folder with train2id_Consistent_withAugmentation.txt
 
     public static void main(String[] args) throws IOException {
-        // Apri il file
+        folder_path=args[0];
+
+        // open the file
         File file = new File(folder_path+"train2id_Consistent_withAugmentation.txt");
         BufferedReader reader = new BufferedReader(new FileReader(file));
 
-        // Leggi il primo numero
+        // read first number
         reader.readLine();
 
-        // Leggi le triple
+        // read the triples
         List<Triple_Integer> triples = new ArrayList<>();
         Set<Integer> all_entities = new LinkedHashSet<>();
         String line;
@@ -28,7 +30,8 @@ public class CC_Generator {
             Triple_Integer mytriple = new Triple_Integer(subject, predicate, object);
             triples.add(mytriple);
         }
-        // Chiudi il reader
+
+        // Close the reader
         reader.close();
 
         //build adjacency matrix
@@ -38,14 +41,20 @@ public class CC_Generator {
             adj_matrix[t.getObject()][t.getSubject()]=true;
         }
 
+        //get neighbors for each entity
         Map<Integer, Set<Integer>> list_neighbors = get_neighbors(adj_matrix, all_entities);
 
+        //get cc for each entity
         Map<Integer,Float> mapCC=createMapCC(all_entities.stream().toList(),triples,list_neighbors);
 
+        //print CCs in a file
         print_on_file_CCMap(mapCC);
 
     }
 
+    /*
+    FUNCTION UTIL to print the CC related to each entity in a file
+     */
     private static void print_on_file_CCMap(Map<Integer, Float> mapCC) {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(folder_path+"CCs.txt"))) {
             for (Map.Entry<Integer, Float> entry : mapCC.entrySet()) {
@@ -59,38 +68,24 @@ public class CC_Generator {
         }
     }
 
-    private static void CreateAll_Entites_and_triples(List<Triple_Integer> triples, List<Integer> all_entities) throws FileNotFoundException {
-
-        // Open the file with all the training triples
-        File file = new File("train2id.txt");
-        Scanner scanner = new Scanner(file);
-
-        // Leggi il primo numero
-        int number_of_triples = scanner.nextInt();
-        scanner.nextLine();
-
-        while (scanner.hasNextLine()) {
-            String line = scanner.nextLine();
-            String[] parts = line.split(" ");
-            int subject = Integer.parseInt(parts[0]);
-            int object = Integer.parseInt(parts[1]);
-            int predicate = Integer.parseInt(parts[2]);
-            all_entities.add(subject);
-            all_entities.add(object);
-            Triple_Integer triple = new Triple_Integer(subject, predicate, object);
-            triples.add(triple);
-        }
-        // Chiudi lo scanner
-        scanner.close();
-    }
-
+    /*
+    FUNCTION to compute the CC related to each entity
+    input 1: A list containing the IDs of all entities.
+    input 2: A list of triples (not used in this function).
+    input 3: A map of entity IDs to a set of their neighbors.
+    output: A map of entity IDs to their clustering coefficients.
+     */
     private static Map<Integer, Float> createMapCC(List<Integer> all_entities, List<Triple_Integer> triples, Map<Integer, Set<Integer>> list_neighbors) {
+        // Initialize the output map.
         Map<Integer, Float> mapCC=new HashMap<>();
         System.out.println("Creating MapCC");
 
         int percentage=0;
+        // Iterate over all the entities.
         for(Integer entity:all_entities){
             System.out.println("Percentage creation CCs:"+(float)100*percentage/ all_entities.size());
+
+            // Retrieve the neighbors of the current entity.
             List<Integer> neighbors;
             if(list_neighbors.get(entity)!=null) {
                 neighbors = list_neighbors.get(entity).stream().toList();
@@ -99,11 +94,13 @@ public class CC_Generator {
                 neighbors=new ArrayList();
             }
 
+            // If the entity has fewer than two neighbors, its clustering coefficient is 0.
             if (neighbors.size()<2){mapCC.put(entity,(float)0);continue;}
 
             int k=neighbors.size();
             int count=0;
             int index=0;
+            // Count how many pairs of neighbors are connected.
             for(Integer n1:neighbors){
                 for(Integer n2:neighbors.subList(index+1,neighbors.size())){
                     if(list_neighbors.get(n1).contains(n2)||list_neighbors.get(n2).contains(n1)){
@@ -113,7 +110,8 @@ public class CC_Generator {
                 index++;
             }
 
-            mapCC.put(entity,(float)count/(k*(k-1)/2));
+            // Compute the clustering coefficient using the formula.
+            mapCC.put(entity,(float)count/(k*(k-1)/2));     //cc formula
             percentage++;
         }
 
@@ -122,14 +120,21 @@ public class CC_Generator {
         return mapCC;
     }
 
+    /*
+    FUNCTION to get the neighbors (1 hop) of each entity
+    input 1: adjacency matrix containing all the neighbors in the KG
+    input 2: list of all the entities in the KG
+    output: map of each entity and the set of its direct neighbors
+     */
     private static Map<Integer, Set<Integer>> get_neighbors(boolean[][] adj_matrix, Set<Integer> all_entities) {
         Map<Integer, Set<Integer>> dictionary_neighbors = new HashMap<>();
 
         Integer percentage=0;
+        //forall the entities in the kg
         for (Integer entity : all_entities) {
-            //System.out.println("Percentage neighbors creation:"+100*(float)percentage/all_entities.size());
             Set<Integer> myneighbors=new HashSet<>();
 
+            //if the adjacency matrix is true in [entity][i] means that i is a neighbor
             for(int i=0;i<all_entities.size();i++){
                 if(adj_matrix[entity][i])myneighbors.add(i);
             }

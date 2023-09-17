@@ -26,21 +26,15 @@ using namespace std;
 
 const REAL pi = 3.141592653589793238462643383;
 
-//---------------CHOOSE THE HEURISTIC -----------------------------------------
-//  1- SANS (random)
-//	2- SANS + highest CC
-//  3- SANS + JACCARD
-
 INT number_of_iteration;
-INT choice_heuristic;
 float percentage_of_negatives_generated;
-bool use_heuristics;
+bool use_structure;
 bool use_ontology;
 
+//STANDARD SETTINGS
 INT typeOf_ID=275;
 INT bernFlag = 1;
 INT trainTimes = 1000;
-//INT trainTimes = 10;
 INT nbatches = 1;
 INT threads = 1;
 INT dimension = 100;
@@ -50,22 +44,27 @@ INT count_my_negatives=0;
 float SlovinError=0.05f;
 INT SlovinTries;
 
-
+//PATH/NOTE initialized to ""
 string inPath = "";
-//string inPath = "../TEST_DBYAGO/";
-//string outPath = "";
 string outPath = "";
 string loadPath = "";
 string note = "";
 string old_note="";
 
+//needed for random corruption
 INT *lefHead, *rigHead;
 INT *lefTail, *rigTail;
+REAL *relationVec, *entityVec;
+REAL *relationVecDao, *entityVecDao;
+INT *freqRel, *freqEnt;
+REAL *left_mean, *right_mean;
 
+//structure to save a triple
 struct Triple {
 	int h, r, t;
 };
 
+//3D matrix to store all the negatives create (to not repeat them) and the training data (to not use them as negatives)
 typedef std::unordered_map<int, bool> InnerMap;
 typedef std::unordered_map<int, InnerMap> MiddleMap;
 typedef std::unordered_map<int, MiddleMap> OuterMap;
@@ -90,20 +89,20 @@ public:
 private:
     OuterMap data;
 };
+Sparse3DMatrix adjacencyList_all_trainTriples; 	
 
-
+//structures to save training data
 Triple *trainHead, *trainTail, *trainList;
+
+//to save negatives coming from a previous iteration
 std::map<int, std::vector<Triple>> prevIter_negativesList;
 
 
-//NEEDED TO HANDLE THE HEURISTIC-BASED NEGATIVES GENERATION
+//NEEDED TO HANDLE THE STRUCTURE-BASED NEGATIVES GENERATION
 std::vector<vector<int>> mapNeighbors;
-std::map<int, std::vector<int>> mapAllRelations_outgoing;
-std::map<int, std::vector<int>> mapAllRelations_incoming;
 std::vector<float> mapCCs;
-std::vector<float> mapDegree;
-Sparse3DMatrix adjacencyList_all_trainTriples; 	
-
+vector<int> testineT_neigh;
+vector<int> testineH_neigh;
 
 //NEEDED TO HANDLE THE ONTOLOGY-BASED NEGATIVES GENERATION
 std::map<int, std::vector<int>> mapDisjointClasses;
@@ -122,21 +121,23 @@ vector<bool> asymmetric_property_to_be_used;
 vector<bool> irreflexive_proprerty_to_be_used;
 vector<int> testineT_ontology;
 vector<int> testineH_ontology;
-vector<int> testineT_neigh;
-vector<int> testineH_neigh;
+
+
+// % of entities that are instances of no class
 INT Perc_EntitiesWithNoClass;
 INT Perc_EntitiesWithNoClass_nr;
-INT percentage_coverage_ont;
+
+//numbers of relations,entity, train triples, train triples from previous iteration
+INT relationTotal, entityTotal, tripleTotal, previous_iteration_negatives_Total;
 
 
 
-
+//functions needed for random creation
 struct cmp_head {
 	bool operator()(const Triple &a, const Triple &b) {
 		return (a.h < b.h)||(a.h == b.h && a.r < b.r)||(a.h == b.h && a.r == b.r && a.t < b.t);
 	}
 };
-
 struct cmp_tail {
 	bool operator()(const Triple &a, const Triple &b) {
 		return (a.t < b.t)||(a.t == b.t && a.r < b.r)||(a.t == b.t && a.r == b.r && a.h < b.h);
@@ -188,65 +189,21 @@ void norm(REAL * con) {
 		for (INT ii=0; ii < dimension; ii++)
 			*(con + ii) /= x;
 }
-
 /*
-	Read triples from the training file.
+	function to add negatives/training triples to the 3d matrix
 */
-
-INT relationTotal, entityTotal, tripleTotal, previous_iteration_negatives_Total;
-REAL *relationVec, *entityVec;
-REAL *relationVecDao, *entityVecDao;
-INT *freqRel, *freqEnt;
-REAL *left_mean, *right_mean;
-
 void addEdge(int from, int relation, int to) {
 		adjacencyList_all_trainTriples.set(from,to,relation);
 }
-
+/*
+	function to order the neighbors based on cc
+*/
 bool compareByMapValue_cc(const int& a, const int& b, const std::vector<float>& mymap) {
     return mymap[a] > mymap[b];		//DECREASING order
 }
-
-bool compareByMapValue_similarity(const int& a, const int& b, const std::vector<float>& mymap) {
-    return mymap[a] > mymap[b];		//decreasing order- i substitute an entity with one that has low similarity
-}
-bool compareByMapValue_int(const int& a, const int& b, const std::vector<int>& mymap) {
-    return mymap[a] > mymap[b];		//decreasing order- i substitute an entity with one that has few relationships in common
-}
-
-std::vector<int> findNumCommonRel(int entity,vector<int> neighbors){
-	//cout<<"inside findnumcommonrel \n";
-	//find all the relations of my entity
-	vector<int> myentityrels_out=mapAllRelations_outgoing[entity];
-	vector<int> myentityrels_inc=mapAllRelations_incoming[entity];
-
-
-	//create a vector of int that uses as indexes the entities_id and as values their number of common relationship with the entity
-	vector<int> result;
-	for(int i=0;i<neighbors.size();i++){
-		vector<int> commonElements_out;
-		vector<int> commonElements_inc;
-		int curr_neigh=neighbors[i];
-
-		
-			std::set_intersection(myentityrels_out.begin(), myentityrels_out.end(), mapAllRelations_outgoing[curr_neigh].begin(), mapAllRelations_outgoing[curr_neigh].end(), std::back_inserter(commonElements_out));
-			std::set_intersection(myentityrels_inc.begin(), myentityrels_inc.end(), mapAllRelations_incoming[curr_neigh].begin(), mapAllRelations_incoming[curr_neigh].end(), std::back_inserter(commonElements_inc));
-
-			if(result.size()<=curr_neigh){
-				result.resize(curr_neigh+1);
-			}
-
-			if(myentityrels_inc.size()+myentityrels_out.size() !=0){
-				result[curr_neigh]=(commonElements_out.size()+commonElements_inc.size())/(myentityrels_inc.size()+myentityrels_out.size());
-			}
-			else{
-				result[curr_neigh]=0.5;
-			}
-
-	}
-
-	return result;
-}
+/*
+	retrieve the embedding for the entity 'entity'
+*/
 std::vector<float> getEmbeddingforEntity(int entity){
 	vector<float> result(dimension);
 	for(int i=0;i<dimension;i++){
@@ -255,6 +212,9 @@ std::vector<float> getEmbeddingforEntity(int entity){
 
 	return result;
 }
+/*
+	L2 norm of the vector v
+*/
 float normEmbedding(const std::vector<float>& v) {
     float result = 0.0f;
     for (size_t i = 0; i < v.size(); i++) {
@@ -262,7 +222,9 @@ float normEmbedding(const std::vector<float>& v) {
     }
     return std::sqrt(result);
 }
-
+/*
+	compute the cosine similarity
+*/
 float computeSimilarity(vector<float> embedding1,vector<float> embedding2){
 	float result=0;
 	for(int i=0;i<dimension;i++){
@@ -271,34 +233,9 @@ float computeSimilarity(vector<float> embedding1,vector<float> embedding2){
 	
 	return result;
 }
-
-
-std::vector<float> findSimilarities(int entity,vector<int> neighbors){
-	//cout<<"inside findsimil \n";
-	//find all the relations of my entity
-	vector<float> myembedding=getEmbeddingforEntity(entity);
-	//cout<<"here 1\n";
-	//create a vector of int that uses as indexes the entities_id and as values their number of common relationship with the entity
-	vector<float> result;
-	for(int j=0;j<neighbors.size();j++){
-		int curr_neigh=neighbors[j];
-		vector<float> neighbor_embedding=getEmbeddingforEntity(curr_neigh);
-		//cout<<"got embedding neigh \n";
-		if(result.size()<=curr_neigh){
-			result.resize(curr_neigh+1);
-		}
-		//cout<<"pre-computesimilarity \n";
-		result[curr_neigh]=computeSimilarity(myembedding,neighbor_embedding);
-	}
-	return result;
-}
-void FillMapsOfRelations(){
-	for(int i=0;i<tripleTotal;i++){
-		mapAllRelations_outgoing[trainList[i].h].push_back(trainList[i].r);
-		mapAllRelations_incoming[trainList[i].t].push_back(trainList[i].r);
-	}
-}
-
+/*
+	scanning the train triples, fill two maps: one that link every class to its entities and one that maps every entity to its classes
+*/
 void fillMapsOfClassesAndEntities(){
 	for(int i=0;i<tripleTotal;i++){
 		if(trainList[i].r==typeOf_ID){
@@ -307,6 +244,9 @@ void fillMapsOfClassesAndEntities(){
 		}
 	}
 }
+/*
+	compute the percentage of entities that have no class: entities that don't appear in the map mapEntitiesToClasses
+*/
 void percentageEntitiesWithNoClass(){
 	int count_noclass_ent=0;
 	for(int i=0;i<entityTotal;i++){
@@ -314,54 +254,30 @@ void percentageEntitiesWithNoClass(){
 			count_noclass_ent++;
 		}
 	}
-	//if(percentage_coverage_ont>100-(double)100*count_noclass_ent/entityTotal){
-	//		Perc_EntitiesWithNoClass=(double)100*count_noclass_ent/entityTotal;
-	//		cout<<"Non arrotondo";
-	//}
-	//else{
-	//	cout<<"Arrotondo per difetto";
-		Perc_EntitiesWithNoClass=(double)10*count_noclass_ent/entityTotal;
-		Perc_EntitiesWithNoClass=(double)10*Perc_EntitiesWithNoClass;
-
-		Perc_EntitiesWithNoClass_nr=(double)100*count_noclass_ent/entityTotal;
-	//}
 	
+	//rounded percentage
+	Perc_EntitiesWithNoClass=(double)10*count_noclass_ent/entityTotal;
+	Perc_EntitiesWithNoClass=(double)10*Perc_EntitiesWithNoClass;
+
+	//not rounded percentage
+	Perc_EntitiesWithNoClass_nr=(double)100*count_noclass_ent/entityTotal;
 
 	cout<<"The entities with no class are:"<<Perc_EntitiesWithNoClass<<" % \n";
 
 }
-
-
-
-void order_and_cut_map_neighbors(){
-	cout<<"Sorting the neighbors based on the chosen heuristic: \n";
-	switch(choice_heuristic){
-		case 1:
-			cout<<"the settings do not require a specific order of the neighbors.";
-			break;
-		case 2:
-			for(int entity_id=0;entity_id<mapNeighbors.size();entity_id++){
-				std::sort(mapNeighbors[entity_id].begin(), mapNeighbors[entity_id].end(), [&](const int& a, const int& b) {return compareByMapValue_cc(a, b, mapCCs);});
-			}
-			break;				
-		case 3:
-			for(int entity_id=0;entity_id<mapNeighbors.size();entity_id++){
-				//cout<<"entity_corrente"<<entity_id<<" con "<<mapNeighbors[entity_id].size()<<"neighbors \n";
-				if(mapNeighbors[entity_id].size()>0){
-					vector<int> num_of_commonrel=findNumCommonRel(entity_id,mapNeighbors[entity_id]);
-					//cout<<"dopo findnumcomon \n";
-					std::sort(mapNeighbors[entity_id].begin(), mapNeighbors[entity_id].end(), [&](const int& a, const int& b) {return compareByMapValue_int(a, b, num_of_commonrel);});
-          			//mapNeighbors[entity_id].erase(std::remove_if(mapNeighbors[entity_id].begin(), mapNeighbors[entity_id].end(), [&](const int& elem) {return (num_of_commonrel[elem] == 0);}), mapNeighbors[entity_id].end());
-				}
-			}
-			break;
-		
-		default:
-			cout<<"the settings do not require a specific order of the neighbors.";
+/*
+	order the neighbors based on their cc
+*/
+void order_neighbors(){
+	cout<<"Sorting the neighbors : \n";
+	for(int entity_id=0;entity_id<mapNeighbors.size();entity_id++){
+		std::sort(mapNeighbors[entity_id].begin(), mapNeighbors[entity_id].end(), [&](const int& a, const int& b) {return compareByMapValue_cc(a, b, mapCCs);});
 	}
 	cout<<"done \n";
 }
-
+/*
+	add superclasses in the domain because of the entailed axiom: p-domain->x,x-subclass->y implies p-domain->y
+*/
 void AddSuperClassesForGenericity_domain(){
 	for(const auto& myentry:mapDomains){
         vector<int> my_super_classes;
@@ -370,8 +286,6 @@ void AddSuperClassesForGenericity_domain(){
                 my_super_classes.insert(my_super_classes.end(),mapSuperClasses[mydomain_class].begin(),mapSuperClasses[mydomain_class].end());
 			}
 		}
-        //if i have superclasses of my classes i include them in the allowed classes because a lot of entities that are allowed in the domain
-		// are also in relationship "type" with the superclass (that could be not included in the dom)
         for(const auto& superclass:my_super_classes){
             if(find(myentry.second.begin(),myentry.second.end(),superclass)==myentry.second.end()){
                 mapDomains[myentry.first].push_back(superclass);
@@ -379,6 +293,9 @@ void AddSuperClassesForGenericity_domain(){
         }			
 	}
 }
+/*
+	add superclasses in the range because of the entailed axiom: p-range->x,x-subclass->y implies p-range->y
+*/
 void AddSuperClassesForGenericity_range(){
 	for(const auto& myentry:mapRanges){
         vector<int> my_super_classes;
@@ -387,8 +304,6 @@ void AddSuperClassesForGenericity_range(){
                 my_super_classes.insert(my_super_classes.end(),mapSuperClasses[myrange_class].begin(),mapSuperClasses[myrange_class].end());
 			}
 		}
-        //if i have superclasses of my classes i include them in the allowed classes because a lot of entities that are allowed in the range
-		// are also in relationship "type" with the superclass (that could be not included in the range)
         for(const auto& superclass:my_super_classes){
             if(find(myentry.second.begin(),myentry.second.end(),superclass)==myentry.second.end()){
                 mapRanges[myentry.first].push_back(superclass);
@@ -396,7 +311,9 @@ void AddSuperClassesForGenericity_range(){
         }			
 	}
 }
-
+/*
+	create map of classes that are not admitted as the domain of each property
+*/
 void CreateMapNotAdmitted_domain(){
 	for(const auto& entry:mapDomains){
 		vector<int> my_domain_classes=entry.second;
@@ -406,13 +323,11 @@ void CreateMapNotAdmitted_domain(){
 			}
    		}
 	}
-
-
-			cout<<"Le classi non ammesse per la relazione 281 sono:"<<mapNotAdmitted_domain[281].size();
-
-
+	cout<<"Le classi non ammesse per la relazione 281 sono:"<<mapNotAdmitted_domain[281].size();
 }
-
+/*
+	create map of classes that are not admitted as the range of each property
+*/
 void CreateMapNotAdmitted_range(){
 	for(const auto& entry:mapRanges){
 		vector<int> my_range_classes=entry.second;
@@ -422,26 +337,12 @@ void CreateMapNotAdmitted_range(){
 			}
    		}
 	}
-
-
-			cout<<"Le classi non ammesse per la relazione 281 sono:"<<mapNotAdmitted_range[281].size();
-
+	cout<<"Le classi non ammesse per la relazione 281 sono:"<<mapNotAdmitted_range[281].size();
 }
-
-
-void	PercentageOntologyCoverage(){
-	int count_ok=0;
-	for(int i=0;i<tripleTotal;i++){
-		if(trainList[i].r==typeOf_ID)
-		{count_ok++;}
-	}
-	percentage_coverage_ont= (double)100*count_ok/tripleTotal;
-}
-
-
-
+/*
+	for iterations following the first one, this function initializes the embeddings using the previously computed embeddings
+*/
 void load() {
-	
 	FILE *fin;
 	INT tmp;
 	fin = fopen((inPath + "entity2vec" + old_note + ".vec").c_str(), "r");
@@ -459,11 +360,12 @@ void load() {
 	}
 	fclose(fin);
 }
-
-
-
+/*
+	initialize the structures with the traintriples, with neighbors for structure-based negativess, with the axioms for ontology-based negatives, with  the negatives generated in previous iterations
+*/
 void init() {
-	
+
+	// Retrieve the ID related to the 'type' relationship
 	FILE *fin;
 	INT tmp;
 	char buffer[1024]; 
@@ -481,19 +383,18 @@ void init() {
 	cout<<"The ID of typeOf rel. is:"<<typeOf_ID<<"\n";
 	fclose(fin);
 
+	// initialize the embeddings of relations randomly
 	relationVec = (REAL *)calloc(relationTotal * dimension, sizeof(REAL));
 	for (INT i = 0; i < relationTotal; i++) {
 		for (INT ii=0; ii<dimension; ii++)
 			relationVec[i * dimension + ii] = randn(0, 1.0 / dimension, -6 / sqrt(dimension), 6 / sqrt(dimension));
 	}
-
 	fin = fopen((inPath +"entity2id.txt").c_str(), "r");
 	tmp = fscanf(fin, "%d", &entityTotal);
 	fclose(fin);
 
-	SlovinTries=entityTotal/((double)1+SlovinError*SlovinError*entityTotal);
-	cout<<"slovin tries:"<<SlovinTries;
-
+	
+ 	// initialize the embeddings of entities randomly
 	entityVec = (REAL *)calloc(entityTotal * dimension, sizeof(REAL));
 	for (INT i = 0; i < entityTotal; i++) {
 		for (INT ii=0; ii<dimension; ii++)
@@ -501,9 +402,13 @@ void init() {
 		norm(entityVec+i*dimension);
 	}
 
+ 	// set a limit of tries to do to look for the ontology-based triples to speed up the computation
+	SlovinTries=entityTotal/((double)1+SlovinError*SlovinError*entityTotal);
+	cout<<"slovin tries:"<<SlovinTries;
+
+	//set up the structure with the training triples, also counting the frequence of entities and relations
 	freqRel = (INT *)calloc(relationTotal + entityTotal, sizeof(INT));
 	freqEnt = freqRel + relationTotal;
-
 	for (INT i = 0; i < entityTotal; i++) {
 		freqEnt[i]=0;
 	}
@@ -523,20 +428,6 @@ void init() {
 		trainTail[i] = trainList[i];
 	}
 	fclose(fin);
-	//int freqent_tot=0;
-	//for (INT i = 0; i < entityTotal; i++) {
-	//	freqent_tot+=freqEnt[i];
-	//	freqEnt[i]=(trainTimes*freqEnt[i])\2;
-		//cout<<"entita "<<i<<"ha frequenza"<<freqEnt[i]<<"e la media e "<<freqEnt_tot/entityTotal;
-	//}
-	//int freqent_avg=freqent_tot/entityTotal;
-
-	//for (INT i = 0; i < entityTotal; i++) {
-	//	if(freqEnt[i]>freqent_avg)freqEnt[i]=1;
-	//	else freqEnt[i]=0;
-				//cout<<"entita "<<i<<"ha frequenza"<<freqEnt[i]<<"e la media e "<<freqEnt_tot/entityTotal;
-
-	//}
 	
 
 	/*----------------------- IF IT'S NOT THE FIRST ITERATION, LOAD THE NEGATIVES FROM PREVIOUS ITERATIONS --------------------------*/
@@ -552,16 +443,11 @@ void init() {
 				tmp = fscanf(fin, "%d", &new_neg.t);
 				tmp = fscanf(fin, "%d", &new_neg.r);
 				prevIter_negativesList[id_curr].push_back(new_neg);
-				
-				//cout<<"check-match)the positive was: "<<trainList[id_curr].h<<"-"<<trainList[id_curr].r<<"-"<<trainList[id_curr].t<<"\n";
-				//cout<<"check-match)the neg is: "<<prevIter_negativesList[id_curr][0].h<<"-"<<prevIter_negativesList[id_curr][0].r<<"-"<<prevIter_negativesList[id_curr][0].t<<"\n";
 		}
 		fclose(fin);
 	}
 
-	/*-----------------------ADDITIONAL PART TO ALLOCATE THE ADJACENCY MATRIX AND POPULATE IT --------------------------------------*/
-
-	//populate the adjacency list
+	/*----------------------- ALLOCATE THE 3d MATRIX to store used negatives and training triples AND POPULATE IT with training triples--------------------------------------*/
 	cout<<"populating adjacency list : ";
 	int i;
 	for(i=0;i<tripleTotal;i++){
@@ -570,11 +456,7 @@ void init() {
 	}	
 	cout<<"done \n";
 
-	
-
-	/*----------------------------------INITIALIZE STRUCTURES NEEDED FOR STANDARD RANDOM CREATION-----------------------------------------------*/
-
-
+	/*----------------------------------INITIALIZE STRUCTURES NEEDED FOR STANDARD RANDOM CREATION - same as TransE----------------------------------------------*/
 	sort(trainHead, trainHead + tripleTotal, cmp_head());
 	sort(trainTail, trainTail + tripleTotal, cmp_tail());
 
@@ -622,11 +504,9 @@ void init() {
 	relationVecDao = (REAL*)calloc(dimension * relationTotal, sizeof(REAL));
 	entityVecDao = (REAL*)calloc(dimension * entityTotal, sizeof(REAL));
 	
-	/*ADDITIONAL PART FOR LOADING THE INPUT FILES WITH THE ONTOLOGY AXIOMS NEEDED TO BUILD THE NEGATIVES --------------------------------*/
-	//std::map<int16_t, std::vector<int16_t>> mapDisjointClasses;
-	//std::map<int16_t, std::vector<int16_t>> mapDomains;
-	//std::map<int16_t, std::vector<int16_t>> mapRanges;
-	//std::map<int16_t, std::vector<int16_t>> mapClassesToEntities;
+	/*----------------ADDITIONAL PART FOR LOADING THE INPUT FILES WITH THE ONTOLOGY AXIOMS NEEDED TO BUILD THE NEGATIVES --------------------------------*/
+	
+	// load disjoint classes axioms
 	if(percentage_of_negatives_generated>0){
 	cout<<"loading Disjoint-classes file: ";
 	std::ifstream filedisj((inPath +"DisjointWith_axioms.txt").c_str());
@@ -655,6 +535,7 @@ void init() {
     mapDisjointClasses_for_head_change=mapDisjointClasses;
 	cout<<"done \n";
 
+	// load domain axioms
 	cout<<"loading Domain-axioms file: ";
 	std::ifstream filedom((inPath +"Domain_axioms.txt").c_str());
     if (filedom.is_open()) {
@@ -681,6 +562,7 @@ void init() {
 	}
 	cout<<"done \n";
 
+	// load range axioms
 	cout<<"loading Range-axioms file: ";
 	std::ifstream filerange((inPath +"Range_axioms.txt").c_str());
     if (filerange.is_open()) {
@@ -707,6 +589,7 @@ void init() {
 	}
 	cout<<"done \n";
 
+	// load superclasses axioms
 	cout<<"loading SuperClasses file: ";
 	std::ifstream fileSuperClasses((inPath +"SuperClasses_axioms.txt").c_str());
     if (fileSuperClasses.is_open()) {
@@ -733,6 +616,7 @@ void init() {
 	}
 	cout<<"done \n";
 
+	// load irreflexive relations axioms
 	cout<<"loading irreflexive relations file: ";
 	irreflexive_proprerty_to_be_used.resize(tripleTotal,false);
 	std::ifstream fileIrreflexiveProp((inPath +"IrreflexiveProperties_axioms.txt").c_str());
@@ -750,6 +634,7 @@ void init() {
 	}
 	cout<<"done \n";
 
+	// load asymmetric relations axioms
 	cout<<"loading asymmetric relations file: ";
 	asymmetric_property_to_be_used.resize(tripleTotal,false);
 	std::ifstream fileAsymmProp((inPath +"AsymmetricProperties_axioms.txt").c_str());
@@ -768,16 +653,19 @@ void init() {
 	cout<<"done \n";
 
 
-    /*Create a map of all the classes and the respective entities*/
+    //Create 2 maps: 1 map of all the classes and the respective entities & 1 viceversa
 	fillMapsOfClassesAndEntities();
 
+	//add superclasses in domain and range for entailed axioms
 	AddSuperClassesForGenericity_domain();
 	AddSuperClassesForGenericity_range();
+
+	//create a map with not admitted classes domain & range
     CreateMapNotAdmitted_domain();
 	CreateMapNotAdmitted_range();
-	PercentageOntologyCoverage();
-	percentageEntitiesWithNoClass();
 
+	//compute percentage entities witout class
+	percentageEntitiesWithNoClass();
     }
 
 	/*----------------------------------------------------------------------------------------------------------------------*/	
@@ -824,13 +712,7 @@ void init() {
     }
 	    cout<<"done \n";
 
-	
-
-
-	/*----------------------------------------------------------------------------------------------------------------------*/
-
-	/*------------if CHOSEN HEURISTIC IS SANS-CC --> LOAD CCs --------------------------------------------------------------*/
-	if(choice_heuristic==2){
+	/*------------ LOAD CCs --------------------------------------------------------------*/
 		std::ifstream file2((inPath +"CCs.txt").c_str());
 		if (file2.is_open()) {
 			std::string line;
@@ -848,30 +730,16 @@ void init() {
 		} else {
 			std::cerr << "Failed to open file: /content/CCs.txt" << std::endl;
 		}			
+
+	/*-----------------------ORDER AND CUT THE NEIGHBORS MAP BASED ON CC -------------------------*/
+	if(use_structure==true){
+	order_neighbors();
 	}
-	/*----------------------------------------------------------------------------------------------------------------------*/
 
-
-	/*------------if CHOSEN HEURISTIC IS SANS-jaccard--> LOAD relations --------------------------------------------------------------*/
-	if(choice_heuristic==3){
-		cout<<"filling maps of the relations: ";
-		FillMapsOfRelations();
-		cout<<"done \n";
-	}
-	/*----------------------------------------------------------------------------------------------------------------------*/
-
-	/*-------------------------------SECOND+ ITERATION: LOAD PREVIOUS EMBEDDINGS + HEURISTIC COSINE SIMILARITY ----------------*/
+	/*-------------------------------SECOND+ ITERATION: LOAD PREVIOUS EMBEDDINGS  ----------------*/
 	if(number_of_iteration>1){
 		load();
 	}
-	/*------------------------------------------------------------------------------------------------------------------------*/
-
-	/*-----------------------ORDER AND CUT THE NEIGHBORS MAP BASED ON WHICH HEURISTIC HAS BEEN CHOSEN-----------------------*/
-	if(use_heuristics==true){
-	order_and_cut_map_neighbors();
-	}
-	/*-----------------------------------------------------------------------------------------------------------------------*/
-
 
   cout << "End init \n";
 }
@@ -879,13 +747,16 @@ void init() {
 
 
 /*
-	Training process of transE.
+	Training process of transHI------------------------------------------------------------------------------------------------------------------------------------
 */
 
 INT Len;
 INT Batch;
 REAL res;
 
+/*
+	Compute score of triple e1,rel,e2
+*/
 REAL calc_sum(INT e1, INT e2, INT rel) {
 	REAL sum=0;
 	INT last1 = e1 * dimension;
@@ -896,7 +767,9 @@ REAL calc_sum(INT e1, INT e2, INT rel) {
 		sum += fabs(entityVec[last2 + ii] - entityVec[last1 + ii] - relationVec[lastr + ii]);
 	return sum;
 }
-
+/*
+	Compute gradient given a positive triple e1_a,rel_a,e2_a and a negative one e1_b,rel_b,e2_b
+*/
 void gradient(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b) {
 	INT lasta1 = e1_a * dimension;
 	INT lasta2 = e2_a * dimension;
@@ -924,18 +797,22 @@ void gradient(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b) {
 		entityVec[lastb2 + ii] += x;
 	}
 }
-
+/*
+	compute loss given a positive triple e1_,rel_a,e2_a and a negative one e1_b,rel_b,e2_b
+*/
 void train_kb(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b) {
-	
-  REAL sum1 = calc_sum(e1_a, e2_a, rel_a);
+  	REAL sum1 = calc_sum(e1_a, e2_a, rel_a);
 	REAL sum2 = calc_sum(e1_b, e2_b, rel_b);
-  
 	if (sum1 + margin > sum2) {
 		res += margin + sum1 - sum2;
 		gradient(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b);
 	}
 }
-
+/*
+	Selects a random tail for a given head h and relation r to generate a negative triple. 
+	The process ensures that the negative triple formed is not a train triples by using a binary search on the head list to avoid existing 
+	training triples.
+*/
 INT corrupt_head(INT id, INT h, INT r) { 
 
 	INT lef, rig, mid, ll, rr;
@@ -970,7 +847,11 @@ INT corrupt_head(INT id, INT h, INT r) {
 
 	return tmp + lef - ll + 1;  
 }
-
+/*
+	Selects a random tail for a given head h and relation r to generate a negative triple. 
+	The process ensures that the negative triple formed is not a train triples by using a binary search on the head list to avoid existing 
+	training triples.
+*/
 INT corrupt_tail(INT id, INT t, INT r) {
 	INT lef, rig, mid, ll, rr;
 	lef = lefTail[t] - 1;
@@ -1010,7 +891,7 @@ INT corrupt_tail(INT id, INT t, INT r) {
 	return tmp + lef - ll + 1;  
 }
 
-//---------------------------PROTOYPE OF THE FUNCTIONS FOR THE SINGLE HEURISTICS ----------------------------
+//---------------------------PROTOYPE OF THE FUNCTIONS FOR CREATION OF NEGATIVES ----------------------------
 
 Triple findReplacement(int h, int r, int t, int postriple_index);
 std::vector<int> getNeighborsToConsider(std::vector<int> my_neighbors, std::map<int, float> mapCC_or_degree);
@@ -1018,35 +899,31 @@ Triple One_negative_creation_with_ontology(int index_positive);
 Triple find_Negative_from_previous_iteration(int index_positive);
 int find_not_similar(int entity);
 
-
-
-
 //----------------------------------------------------------------------------------------------------------
 
-
+/*
+	Function that describes the procedure to do in a single epoch of training
+*/
 void* trainMode(void *con) {
 	INT id, pr, i, j;
 	id = (unsigned long long)(con);
 	next_random[id] = rand();
 
-  //cout<<"id è:"<<id<<"\n";
-  /*Batch è il numero di triple in un batch*/
+  /*Batch is the number of triples in a batch*/
 	for (INT k = Batch / threads; k >= 0; k--) {
-		i = rand_max(id, Len);
-		//cout<<"id e: "<<id<<" e len e: "<<Len;
-   		
+		i = rand_max(id, Len);   		
       
     	double rand_num=(double)100*rand()/RAND_MAX;
 
 		// NEGATIVES CREATION WITH ONTOLOGY
 		//i check the percentage of ontology-based negatives and try  to create a negative with the ontology
-		// if it's not a positive triple for which i can use the ontology i'm going to try with heuristics (checking the percentage of usage)
-		if((rand_num<percentage_of_negatives_generated && (use_ontology||use_heuristics))||(number_of_iteration>1)){
-			//if i can use the ontology i'm going to use it
+		// if it's not a positive triple for which i can use the ontology (or based on the percentage of entities without class) i'm going to try with structure
+		if((rand_num<percentage_of_negatives_generated && (use_ontology||use_structure))||(number_of_iteration>1)){
+			
+			//if iteration=1 i use the ontology based in amount depending on the percentage of entities without class
+			//if iteration=2 i use the ontology always: because in that case the ontology triples are the ones created in the previous iteration
 			double rand_num2=(double)100*rand()/RAND_MAX;
-
 			if((use_ontology==true && number_of_iteration==1 && rand_num2>Perc_EntitiesWithNoClass)||(number_of_iteration>1 && rand_num2>Perc_EntitiesWithNoClass_nr && Perc_EntitiesWithNoClass_nr>=50)|| (number_of_iteration>1 && Perc_EntitiesWithNoClass_nr<50)){
-                			//cout<<"ontology \n";
 
                 bool found=false;
 				Triple mynegative;mynegative.h=-1;mynegative.r=-1;mynegative.t=-1;
@@ -1054,11 +931,13 @@ void* trainMode(void *con) {
 					mynegative=find_Negative_from_previous_iteration(i);
 					if(mynegative.h!=-1)found=true;
 				}
-				else{
+				else{						//create a negative exploiting ontological axioms
 					mynegative=One_negative_creation_with_ontology(i);
 				}
 				if(mynegative.h!=-1){
+					//compute the loss, update embeddings
 					train_kb(trainList[i].h, trainList[i].t, trainList[i].r, mynegative.h, mynegative.t, mynegative.r);
+					//normalize the modified embedddings
 					norm(relationVec + dimension * trainList[i].r);
 					norm(entityVec + dimension * trainList[i].h);
 					norm(entityVec + dimension * trainList[i].t);
@@ -1069,14 +948,15 @@ void* trainMode(void *con) {
 					continue;
 				}
 			}
-			// NEGATIVES CREATION WITH HEURISTICS
-			// I'm going to use heuristics if the ontology based triple could not be generated (not w range/domain & not w disjointwith)
-			if(number_of_iteration==1 && use_heuristics==true ){
-				//cout<<"heur";
+			// NEGATIVES CREATION WITH STRUCTURE
+			// I'm going to use structure if the ontology based triple could not be generated (or because of the percentage of entities without class)
+			if(number_of_iteration==1 && use_structure==true ){
+				//create negative with structure
 				Triple negative = findReplacement(trainList[i].h, trainList[i].r, trainList[i].t,i);
-				//cout<<"pos:"<<trainList[i].h<<"-"<<trainList[i].r<<"-"<<trainList[i].t<<" neg is:"<<negative.h<<"-"<<negative.r<<"-"<<negative.t<<"\n";
 				if(negative.h!=-1){ 
+				//compute the loss, update embeddings
 				train_kb(trainList[i].h, trainList[i].t, trainList[i].r, negative.h, negative.t, negative.r);
+				//normalize the modified embedddings
 				norm(relationVec + dimension * trainList[i].r);
 				norm(entityVec + dimension * trainList[i].h);
 				norm(entityVec + dimension * trainList[i].t);
@@ -1091,70 +971,67 @@ void* trainMode(void *con) {
     	}
 
 
-		// STANDARD RANDOM CREATION OF THE NEGATIVE
-		//cout<<"RANDOM \n";
-		//cout<<"ora scrivo tripla:"<<"\n";
-		//cout<<trainList[i].h<<" "<<trainList[i].t<<" "<<trainList[i].r<<"\n";
-		//if(number_of_iteration==1){
-			if (bernFlag)
-				pr = 1000 * right_mean[trainList[i].r] / (right_mean[trainList[i].r] + left_mean[trainList[i].r]);
-			else
-				pr = 500;
+		// STANDARD RANDOM CREATION OF THE NEGATIVE - as in TransE
+		
+		if (bernFlag)
+			pr = 1000 * right_mean[trainList[i].r] / (right_mean[trainList[i].r] + left_mean[trainList[i].r]);
+		else
+			pr = 500;
 
-			if (randd(id) % 1000 < pr) {
-				//cout<<"here";
-				if(number_of_iteration==1){
-					j = corrupt_head(id, trainList[i].h, trainList[i].r);
-				}
-				else {
-					if(Perc_EntitiesWithNoClass_nr>=50){
-						do{
-							if((double)rand()/RAND_MAX<0.5) j=find_not_similar(trainList[i].t);
-							else j=rand_max(0,entityTotal-1);
-						}while(adjacencyList_all_trainTriples.get(trainList[i].h,j,trainList[i].r)==true || abs(calc_sum(trainList[i].h,j,trainList[i].r))<abs(calc_sum(trainList[i].h,trainList[i].t,trainList[i].r)));
-					}else{
-						do{
-							j=find_not_similar(trainList[i].t);
-						}while(adjacencyList_all_trainTriples.get(trainList[i].h,j,trainList[i].r)==true || abs(calc_sum(trainList[i].h,j,trainList[i].r))<abs(calc_sum(trainList[i].h,trainList[i].t,trainList[i].r)));
-					}
-				}
-						
-								//cout<<"dopo corrupt \n";
-
-				train_kb(trainList[i].h, trainList[i].t, trainList[i].r, trainList[i].h, j, trainList[i].r);
-										//	cout<<"dopo train \n";
-
-				norm(relationVec + dimension * trainList[i].r);
-				norm(entityVec + dimension * trainList[i].h);
-				norm(entityVec + dimension * trainList[i].t);
-				norm(entityVec + dimension * j); 
-			} 
-			else {
-				//cout<<"hereB";
-				if(number_of_iteration==1){
-					j = corrupt_tail(id, trainList[i].t, trainList[i].r);
-				}
-				else {
-						if(Perc_EntitiesWithNoClass_nr>=50){
-							do{
-								if((double)rand()/RAND_MAX<0.5) j=find_not_similar(trainList[i].h);
-								else j=rand_max(0,entityTotal-1);
-							}while(adjacencyList_all_trainTriples.get(j,trainList[i].t,trainList[i].r)==true || abs(calc_sum(j,trainList[i].t,trainList[i].r))<abs(calc_sum(trainList[i].h,trainList[i].t,trainList[i].r)));
-						}else{
-							do{
-								j=find_not_similar(trainList[i].h);
-							}while(adjacencyList_all_trainTriples.get(j,trainList[i].t,trainList[i].r)==true || abs(calc_sum(j,trainList[i].t,trainList[i].r))<abs(calc_sum(trainList[i].h,trainList[i].t,trainList[i].r)));
-						}
-				}
-
-				train_kb(trainList[i].h, trainList[i].t, trainList[i].r, j, trainList[i].t, trainList[i].r);
-
-				norm(relationVec + dimension * trainList[i].r);
-				norm(entityVec + dimension * trainList[i].h);
-				norm(entityVec + dimension * trainList[i].t);
-				norm(entityVec + dimension * j); 
+		if (randd(id) % 1000 < pr) {
+			//if iter=1 no constraints on  random triples
+			if(number_of_iteration==1){
+				j = corrupt_head(id, trainList[i].h, trainList[i].r);
 			}
-		//}
+			else {
+				//if iter>1 apply constraints on random
+				//if entities with no class>50% i don't use always the similarity constraint (because i have to differentiate more the entities used)
+				if(Perc_EntitiesWithNoClass_nr>=50){
+					do{
+						if((double)rand()/RAND_MAX<0.5) j=find_not_similar(trainList[i].t);
+						else j=rand_max(0,entityTotal-1);
+					}while(adjacencyList_all_trainTriples.get(trainList[i].h,j,trainList[i].r)==true || abs(calc_sum(trainList[i].h,j,trainList[i].r))<abs(calc_sum(trainList[i].h,trainList[i].t,trainList[i].r)));
+				}else{
+					do{
+						j=find_not_similar(trainList[i].t);
+					}while(adjacencyList_all_trainTriples.get(trainList[i].h,j,trainList[i].r)==true || abs(calc_sum(trainList[i].h,j,trainList[i].r))<abs(calc_sum(trainList[i].h,trainList[i].t,trainList[i].r)));
+				}
+			}
+			//compute the loss, update embeddings
+			train_kb(trainList[i].h, trainList[i].t, trainList[i].r, trainList[i].h, j, trainList[i].r);
+			//normalize the modified embedddings
+			norm(relationVec + dimension * trainList[i].r);
+			norm(entityVec + dimension * trainList[i].h);
+			norm(entityVec + dimension * trainList[i].t);
+			norm(entityVec + dimension * j); 
+		} 
+		else {
+			//if iter=1 no constraints on  random triples
+			if(number_of_iteration==1){
+				j = corrupt_tail(id, trainList[i].t, trainList[i].r);
+			}
+			else {
+				//if iter>1 apply constraints on random
+				//if entities with no class>50% i don't use always the similarity constraint (because i have to differentiate more the entities used)
+				if(Perc_EntitiesWithNoClass_nr>=50){
+					do{
+						if((double)rand()/RAND_MAX<0.5) j=find_not_similar(trainList[i].h);
+						else j=rand_max(0,entityTotal-1);
+					}while(adjacencyList_all_trainTriples.get(j,trainList[i].t,trainList[i].r)==true || abs(calc_sum(j,trainList[i].t,trainList[i].r))<abs(calc_sum(trainList[i].h,trainList[i].t,trainList[i].r)));
+				}else{
+					do{
+						j=find_not_similar(trainList[i].h);
+					}while(adjacencyList_all_trainTriples.get(j,trainList[i].t,trainList[i].r)==true || abs(calc_sum(j,trainList[i].t,trainList[i].r))<abs(calc_sum(trainList[i].h,trainList[i].t,trainList[i].r)));
+				}
+			}
+			//compute the loss, update embeddings
+			train_kb(trainList[i].h, trainList[i].t, trainList[i].r, j, trainList[i].t, trainList[i].r);
+			//normalize the modified embedddings
+			norm(relationVec + dimension * trainList[i].r);
+			norm(entityVec + dimension * trainList[i].h);
+			norm(entityVec + dimension * trainList[i].t);
+			norm(entityVec + dimension * j); 
+		}
 	}
   
 }
@@ -1166,23 +1043,24 @@ void train(void *con) {
 	FILE *fin;
 	INT tmp;
   
+	// iterate through the epochs of training
 	for (INT epoch = 0; epoch < trainTimes; epoch++) {
 		count_my_negatives=0;
-
 		res = 0;
-		/*divide training in batches to train in different threads*/
+		
+		//we only use 1 batch because of problems updating and looking at the 3d matrix using multiple threads
 		for (INT batch = 0; batch < nbatches; batch++) {
 			    trainMode((void*)batch);
 		}
 		printf("epoch %d %f\n", epoch, res);
-		cout<<"le negative che ho creato sono"<<count_my_negatives<<"\n";
+		cout<<"the negatives i created are: "<<count_my_negatives<<"\n";
 
 		if(count_my_negatives<0.01*tripleTotal && number_of_iteration>1) break;
 	}
 }
 
 /*
-	Get the results of transE.
+	output embeddings in files
 */
 
 void out_binary() {
@@ -1228,7 +1106,7 @@ void out() {
 }
 
 /*
-	Main function
+	function to retrieve main parameters
 */
 
 int ArgPos(char *str, int argc, char **argv) {
@@ -1247,10 +1125,9 @@ int ArgPos(char *str, int argc, char **argv) {
 void setparameters(int argc, char **argv) {
 	int i;
 		if ((i = ArgPos((char *)"-number_iteration", argc, argv)) > 0) number_of_iteration = atoi(argv[i + 1]);
-		if ((i = ArgPos((char *)"-choice_heuristic", argc, argv)) > 0) choice_heuristic = atoi(argv[i + 1]);
 		if ((i = ArgPos((char *)"-percentage_negatives_generated", argc, argv)) > 0) percentage_of_negatives_generated = atoi(argv[i + 1]);
 		if ((i = ArgPos((char *)"-use_ontology", argc, argv)) > 0) {std::string ontologyValue = argv[i + 1];use_ontology = (ontologyValue == "true" || ontologyValue == "1");}
-		if ((i = ArgPos((char *)"-use_heuristics", argc, argv)) > 0) {std::string heuristicsValue = argv[i + 1]; use_heuristics = (heuristicsValue == "true" || heuristicsValue == "1");}
+		if ((i = ArgPos((char *)"-use_structure", argc, argv)) > 0) {std::string heuristicsValue = argv[i + 1]; use_structure = (heuristicsValue == "true" || heuristicsValue == "1");}
 
 		if ((i = ArgPos((char *)"-size", argc, argv)) > 0) dimension = atoi(argv[i + 1]);
 		if ((i = ArgPos((char *)"-input", argc, argv)) > 0) inPath = argv[i + 1];
@@ -1283,7 +1160,7 @@ int main(int argc, char **argv) {
 
 
 //-------------------------------------------------------------------------------------------------------------------
-//---------------------------- IMPLEMENTATIONS OF THE FUNCTIONS FOR THE SINGLE HEURISTICS ---------------------------
+//---------------------------- IMPLEMENTATIONS OF THE FUNCTIONS FOR THE STRUCTURE-BASED NEG.-------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 Triple findReplacement(int h, int r, int t, int postriple_index){
@@ -1302,9 +1179,6 @@ Triple findReplacement(int h, int r, int t, int postriple_index){
 	}
 
 	//check if the entity i want to replace has (enough) neighbors
-	//cout<<"the entity i want to replace is:"<<entityToReplace<<"\n";
-	//std::vector<int> myNeighbors=mapNeighbors[entityToReplace];
-	//cout<<"and it has"<<mapNeighbors[entityToReplace].size()<<"neighbors \n";
 	if(mapNeighbors[entityToReplace].size()==0){							//entity doesn't have neighbors --> random negative
 		negative_to_create.h=-1;negative_to_create.r=-1; negative_to_create.t=-1;
 		return negative_to_create;
@@ -1313,98 +1187,87 @@ Triple findReplacement(int h, int r, int t, int postriple_index){
 	int found;
 	int count=0;
 
-	//cout<<"la size dei miei neighbors è:"<<myNeighbors.size()<<"\n";
     int substitute;
 	if(entityToReplace==h){
-		//cout<<"1."<<testineH_neigh[postriple_index]<<"\n";
+		//Retrieve the last neighbor of this entity that i used for this positive triple
         int i=testineH_neigh[postriple_index];
 		if( mapNeighbors[entityToReplace].size()>0 && i>=0){
-			//cout<<"2.\n";
+			//find a neighbors that i haven't already used to change this entity (substitute!=INT16_MIN) and that doesnt cresate a negative alreadddy used or a positive (adjacencyList_all_trainTriples.get(substitute,t,r)=false)
 			do{
 				i++;
-				//select last replacement entity for "entitytoreplace"
 				substitute=mapNeighbors[entityToReplace][mapNeighbors[entityToReplace].size()-i];
-										//	cout<<"4.\n";
-
 			}while(substitute==INT16_MIN || adjacencyList_all_trainTriples.get(substitute,t,r) && mapNeighbors[entityToReplace].size()-i>0);
 		}
-
+		//if i couldnt find a suitable neighbors
         if(i<0 || mapNeighbors[entityToReplace].size()-i==0){
             found=0;
 			testineH_neigh[postriple_index]=-1;
         }
-		else{
+		else{ 		//if i found a suitable neighbor
 			found=1;
 			testineH_neigh[postriple_index]=i;
+			//important: i change the neighbor used in INT16_MIN so that i won't use it again
 			mapNeighbors[entityToReplace][mapNeighbors[entityToReplace].size()-i]=INT16_MIN;
 		}
 	}
 	else{
+		//Retrieve the last neighbor of this entity that i used for this positive triple
 		int i=testineT_neigh[postriple_index];
-													//cout<<"5.\n";
 
         if( mapNeighbors[entityToReplace].size()>0 && i>=0){
-													//cout<<"6.\n";
-
+			//find a neighbors that i haven't already used to change this entity (substitute!=INT16_MIN) and that doesnt cresate a negative alreadddy used or a positive (adjacencyList_all_trainTriples.get(substitute,t,r)=false)
             do{
-													//cout<<"7.\n";
-
 				i++;
-                //select last replacement entity for "entitytoreplace"
                 substitute=mapNeighbors[entityToReplace][mapNeighbors[entityToReplace].size()-i];
-                //if(freqEnt[entityToReplace]==1 && (double)rand()/RAND_MAX>0.5 || freqEnt[entityToReplace]==0)
             }
             while(substitute==INT16_MIN || adjacencyList_all_trainTriples.get(h,substitute,r) && mapNeighbors[entityToReplace].size()-i>0);
         }
-
-        if(i<0 || mapNeighbors[entityToReplace].size()-i==0){
-												//	cout<<"8.\n";
+		//if i couldnt find a suitable neighbors
+        if(i<0 || mapNeighbors[entityToReplace].size()-i==0){				
             found=0;
 			testineT_neigh[postriple_index]=-1;
         }
-		else{
+		else{			//if i found a suitable neighbor
 			found=1;
 			testineT_neigh[postriple_index]=i;
+			//important: i change the neighbor used in INT16_MIN so that i won't use it again
 			mapNeighbors[entityToReplace][mapNeighbors[entityToReplace].size()-i]=INT16_MIN;
 		}
     }
 
-	//cout<<"i tentativi che ho fatto prima di trovarne uno ok sono: "<<count<<"\n";
-	//cout<<"e io scelgo il neighbor con l'indice:"<<i;
 	//if i don't find a negative that hasn't already been created --> random negative
 	if(found==0){
 		negative_to_create.h=-1;negative_to_create.r=-1; negative_to_create.t=-1;
 		return negative_to_create;
 	}
 
-
-	//if(entityToReplace==53)
-		//cout<<"ok i decided to change the entity 53 with the neighbor:"<<myNeighbors[i]<<" and the relation is :"<<r<<" \n";
-	//if i find a negative i return it and save it in the negatives_already_created list
+	//compose the negative and add it to the 3d matrix
 	negative_to_create.r=r; 
 	if(entityToReplace==h){
 		negative_to_create.h=substitute;
 		negative_to_create.t=t;
-		//removeNeighbor(h,i);
 		addEdge(substitute,r,t);
 
 	}
 	else{
 		negative_to_create.h=h;
 		negative_to_create.t=substitute;
-		//removeNeighbor(t,i);
 		addEdge(h,r,substitute);
 	}
 
 	return negative_to_create;
 }
 
+//-------------------------------------------------------------------------------------------------------------------
+//---------------------------- IMPLEMENTATIONS OF THE FUNCTIONS FOR THE ONTOLOGY-BASED NEG.--------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+//from positive (x,p,y) create negative (entity of classes disjointed with y,p,y)
 Triple change_head_disjointWith(int idx_pos) {
     Triple myneg;
     myneg.h = -1;
     myneg.r = -1;
     myneg.t = -1;
-
 
     int h = trainList[idx_pos].h;
     int r = trainList[idx_pos].r;
@@ -1412,8 +1275,10 @@ Triple change_head_disjointWith(int idx_pos) {
 
 	int tries=0;
 
+	//if the tail has disjointed classes
 	if (mapDisjointClasses.find(t) != mapDisjointClasses.end()) {
 
+			//find the max num of entities that the disjointed classes have & intialize mapUsedClasses_disj_h, structure used to speed up the search of entity to be used
 			int max_num_entity=0;
 			bool first_time=false;
 			if(mapUsedClasses_disj_h[idx_pos].size()==0)first_time=true;
@@ -1421,28 +1286,28 @@ Triple change_head_disjointWith(int idx_pos) {
 				if(max_num_entity<mapClassesToEntities[current_class].size()) max_num_entity=mapClassesToEntities[current_class].size();
 				if(first_time)mapUsedClasses_disj_h[idx_pos].push_back(1);
 			}
-			//if(idx_pos==106105)cout<<"maxnum_entity e:"<<max_num_entity<<"e testine deve arrivare a :"<<max_num_entity*mapDisjointClasses_for_head_change[t].size()<<"\n";
 
 
+			//search the entity between the disjointed classes in a rotative way: if i have 3 classes disjointed e.g. A,B,C first im going to try to substitute with an entity from A, then B then C and then A again
 			int index_wanted_class;
 			int wanted_class;
 			int index_wanted_entity;
 			int wanted_entity;
-			//cout<<"le classi che posso usare sono:"<<mapDisjointClasses_for_head_change[t].size();
 			while(myneg.h==-1){
-				//if(idx_pos==106105)cout<<"testineH e:"<<testineH_ontology[idx_pos]<<"\n";
+				//ran out of entities to try
 				if(testineH_ontology[idx_pos]>=(max_num_entity*mapDisjointClasses_for_head_change[t].size())|| tries>SlovinTries){
-					//if(idx_pos==106105)cout<<"if1\n";
 					break;
 				}
+
+				//identify which class i have to try (A or B or C) based on the last one used to corrupt this positive triple (contained in testineH_ontology[idx_pos])
 				index_wanted_class = testineH_ontology[idx_pos]%mapDisjointClasses_for_head_change[t].size();
 				wanted_class=mapDisjointClasses_for_head_change[t][index_wanted_class];
 				index_wanted_entity= testineH_ontology[idx_pos]/mapDisjointClasses_for_head_change[t].size();
-				//cout<<"index_wanted e:"<<index_wanted_entity<<"e le entita della mia classe sono"<<mapClassesToEntities[wanted_class].size()<<"\n";
 
+			
+				//if the class i wanted to try an entity from ran out of entities i skip to the next one and i use the structure mapUsedClasses_disj_h so that next time i'm not trying the class that ran out of entities and i'll save time
 				if(mapClassesToEntities[wanted_class].size()<=index_wanted_entity){
 					testineH_ontology[idx_pos]+=mapUsedClasses_disj_h[idx_pos][index_wanted_class];
-					//if(idx_pos==106105)cout<<"if2\n";
 					int index_temp=index_wanted_class;bool exit;
 					do{
 						index_temp=index_temp-1;
@@ -1459,31 +1324,35 @@ Triple change_head_disjointWith(int idx_pos) {
 
 					continue;
 				}
+
+				//identify the entity that i want to try to substitute
 				wanted_entity=mapClassesToEntities[wanted_class][index_wanted_entity];
+				//see if the negative constructed with it has been already been used
 				if(adjacencyList_all_trainTriples.get(wanted_entity,t,r)==true){
 					tries++;
 					testineH_ontology[idx_pos]=testineH_ontology[idx_pos]+mapUsedClasses_disj_h[idx_pos][index_wanted_class];
-					//if(idx_pos==106105)cout<<"gia presente\n";
 					continue;
 				}
-				//if(idx_pos==106105)cout<<"ok trovata";
-				testineH_ontology[idx_pos]=testineH_ontology[idx_pos]+mapUsedClasses_disj_h[idx_pos][index_wanted_class];
 
+				//compose the negative
+				testineH_ontology[idx_pos]=testineH_ontology[idx_pos]+mapUsedClasses_disj_h[idx_pos][index_wanted_class];
 				myneg.h = wanted_entity;
 				myneg.r = r;
 				myneg.t = t;
 			}
 
+
+			//not found and can't try again for this positive triple
 			if(myneg.h==-1){testineH_ontology[idx_pos]=INT16_MIN;}
-			//cout<<"counter è: "<<counter<<"\n";
 		}
 		else{
+			//not found and can't try again for this positive triple
 			if(myneg.h==-1){testineH_ontology[idx_pos]=INT16_MIN;}
 		}
 
     return myneg;
 }
-
+//from positive (x,p,y) create negative (x,p,entity of classes disjointed with classes(x))
 Triple change_tail_disjointWith(int idx_pos){
 	Triple myneg;
 	myneg.h=-1;myneg.r=-1;myneg.t=-1;
@@ -1497,7 +1366,6 @@ Triple change_tail_disjointWith(int idx_pos){
 	//find all the classes of my head (if there are)
 	if(mapEntitiesToClasses.find(h)!=mapEntitiesToClasses.end()){
 		
-		//vector<int16_t> classes_head=mapEntitiesToClasses[h];
 
 		//for each class of the head, collect the classes that are disjointed with that one
 		set<int> classes_disjointed;
@@ -1512,7 +1380,6 @@ Triple change_tail_disjointWith(int idx_pos){
 		}
 		
 
-
 		std::vector<int> classes_disjointed_vector(classes_disjointed.begin(), classes_disjointed.end());
 
 		//if there are, take them one by one, checking if they have already been used with the counter in testineT_ont
@@ -1524,7 +1391,6 @@ Triple change_tail_disjointWith(int idx_pos){
 				myneg.t=classes_disjointed_vector[testineT_ontology[idx_pos]];
 				testineT_ontology[idx_pos]=testineT_ontology[idx_pos]+1;
 				if(adjacencyList_all_trainTriples.get(myneg.h,myneg.t,myneg.r)==true){
-					//if(idx_pos==1216||idx_pos==1217)cout<<"la negativa "<<myneg.h<<"-"<<myneg.r<<"-"<<myneg.t<<" esisteva gia \n";
 					myneg.h=-1;myneg.r=-1;myneg.t=-1;
 				}
 			}
@@ -1532,8 +1398,6 @@ Triple change_tail_disjointWith(int idx_pos){
 				testineT_ontology[idx_pos]=INT16_MIN;
 			}
 		}
-		//cout<<"counter è: "<<counter<<"\n";
-
 	}
 	else{
 		testineT_ontology[idx_pos]=INT16_MIN;
@@ -1542,7 +1406,7 @@ Triple change_tail_disjointWith(int idx_pos){
 	
 	return myneg;
 }
-
+//from positive (x,p,y) create negative (entity of classes not in the domain of p,p,y)
 Triple change_domain(int idx_pos){
 	Triple myneg;
 	myneg.h=-1;myneg.r=-1;myneg.t=-1;
@@ -1553,9 +1417,12 @@ Triple change_domain(int idx_pos){
 	int r=trainList[idx_pos].r;
 	int t=trainList[idx_pos].t;
 
+	//if the relation has domain classes
 	if(mapDomains.find(r)!=mapDomains.end()){
 
 			std::vector<int> not_admitted_classes=mapNotAdmitted_domain[r];
+
+			//find the max num of entities that the not admitted classes have & intialize mapUsedClasses_domain, structure used to speed up the search of entity to be used
 
 			int max_num_entity=0;
 			bool first_time=false;
@@ -1566,21 +1433,22 @@ Triple change_domain(int idx_pos){
 			}
 
 
-
+			//search the entity between the not admitted classes in a rotative way: if i have 3 classes not admitted e.g. A,B,C first im going to try to substitute with an entity from A, then B then C and then A again
 			int index_wanted_class;
 			int wanted_class;
 			int index_wanted_entity;
 			int wanted_entity;
 			while(myneg.h==-1){
-
+				//ran out of entities to try
 				if(testineH_ontology[idx_pos]>=(max_num_entity*not_admitted_classes.size())||tries>SlovinTries){
 					break;
 				}
+				//identify which class i have to try (A or B or C) based on the last one used to corrupt this positive triple (contained in testineH_ontology[idx_pos])
 				index_wanted_class = testineH_ontology[idx_pos]%not_admitted_classes.size(); 
 				wanted_class=not_admitted_classes[index_wanted_class];
 				index_wanted_entity= testineH_ontology[idx_pos]/not_admitted_classes.size();
 				
-
+				//if the class i wanted to try an entity from ran out of entities i skip to the next one and i use the structure mapUsedClasses_domain so that next time i'm not trying the class that ran out of entities and i'll save time
 				if(mapClassesToEntities[wanted_class].size()<=index_wanted_entity){
 
 					testineH_ontology[idx_pos]+=mapUsedClasses_domain[idx_pos][index_wanted_class];;
@@ -1602,29 +1470,33 @@ Triple change_domain(int idx_pos){
 					
 					continue;
 				}
+				//identify the entity that i want to try to substitute
 				wanted_entity=mapClassesToEntities[wanted_class][index_wanted_entity];
+				//see if the negative constructed with it has been already been used
 				if(adjacencyList_all_trainTriples.get(wanted_entity,t,r)==true){
 					testineH_ontology[idx_pos]=testineH_ontology[idx_pos]+mapUsedClasses_domain[idx_pos][index_wanted_class];
 					tries++;
 					continue;
 				}
+				//compose the negative
 				testineH_ontology[idx_pos]=testineH_ontology[idx_pos]+mapUsedClasses_domain[idx_pos][index_wanted_class];			
 				myneg.h = wanted_entity;
 				myneg.r = r;
 				myneg.t = t;
 			}
-
+			//not found and can't try again for this positive triple
 			if(myneg.h==-1)testineH_ontology[idx_pos]=INT16_MIN;	
 		
 	}
 		else{
+			//not found and can't try again for this positive triple
 			testineH_ontology[idx_pos]=INT16_MIN;	
 		}
 
 
 	return myneg;
 }
-
+//from positive (x,p,y) create negative (x,p,entity of classes not in the range of p)
 Triple change_range(int idx_pos){
 	Triple myneg;
 	myneg.h=-1;myneg.r=-1;myneg.t=-1;
@@ -1634,12 +1506,13 @@ Triple change_range(int idx_pos){
 	int r=trainList[idx_pos].r;
 	int t=trainList[idx_pos].t;
 
+	//if the relation has range classes
 	if(mapRanges.find(r)!=mapRanges.end()){
 		
 		std::vector<int> not_admitted_classes=mapNotAdmitted_range[r];
 
 
-		
+		//find the max num of entities that the not admitted classes have & intialize mapUsedClasses_range, structure used to speed up the search of entity to be used
 		int max_num_entity=0;
 		bool first_time=false;
 		if(mapUsedClasses_range[idx_pos].size()==0)first_time=true;
@@ -1648,11 +1521,13 @@ Triple change_range(int idx_pos){
 			if(first_time)mapUsedClasses_range[idx_pos].push_back(1);
 		}
 
+
+		//search the entity between the not admitted classes in a rotative way: if i have 3 classes not admitted e.g. A,B,C first im going to try to substitute with an entity from A, then B then C and then A again
 		int index_wanted_class;
 		int wanted_class;
 		int index_wanted_entity;
 		int wanted_entity;
-
+		//if the class i wanted to try an entity from ran out of entities i skip to the next one and i use the structure mapUsedClasses_range so that next time i'm not trying the class that ran out of entities and i'll save time
 		while(myneg.h==-1){
 			if(testineT_ontology[idx_pos]>=(max_num_entity*not_admitted_classes.size())||tries>SlovinTries){
 				break;
@@ -1683,26 +1558,27 @@ Triple change_range(int idx_pos){
 
 				continue;
 			}
-
+			//identify the entity that i want to try to substitute
 			wanted_entity=mapClassesToEntities[wanted_class][index_wanted_entity];
-
+			//see if the negative constructed with it has been already been used
 			if(adjacencyList_all_trainTriples.get(h,wanted_entity,r)==true){
 				testineT_ontology[idx_pos]=testineT_ontology[idx_pos]+mapUsedClasses_range[idx_pos][index_wanted_class];
 				tries++;
 				continue;
 			}				
-			
+			//compose the negative
 			testineT_ontology[idx_pos]=testineT_ontology[idx_pos]+mapUsedClasses_range[idx_pos][index_wanted_class];
 			myneg.h = h;
 			myneg.r = r;
 			myneg.t = wanted_entity;
 		}
 		
-
+			//not found and can't try again for this positive triple
 		if(myneg.h==-1)testineT_ontology[idx_pos]=INT16_MIN;
 	}
 	
 	else{
+					//not found and can't try again for this positive triple
 		testineT_ontology[idx_pos]=INT16_MIN;
 	}
 	
@@ -1743,7 +1619,7 @@ Triple One_negative_creation_with_ontology(int index_positive){
 	}
 
 	//DOMAIN-RANGE NEGATIVES
-	//If i want to change the head(/tail) i check if the relationship has a domain(/range)
+	//Check if i have already used the irreflexivity/asymmetry of the relation for this positive triple. If yes, i use rang/domain. If i want to change the head(/tail) i check if the relationship has a domain(/range)
 	//If not, i check if it has a range(/domain)
 	else{
 		if(irreflexive_proprerty_to_be_used[index_positive]==true){
@@ -1780,8 +1656,13 @@ Triple One_negative_creation_with_ontology(int index_positive){
 }
 
 
+//-------------------------------------------------------------------------------------------------------------------
+//---------------------------- IMPLEMENTATIONS OF THE FUNCTIONS FOR ITERATIONS>1-------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 
-
+/*
+	function to match the positive with the negative misclassified in the previous iteration if it exists.
+*/
 Triple find_Negative_from_previous_iteration(int index_positive){
 	Triple res;
 	res.h=-1;res.r=-1;res.t=-1;
@@ -1805,7 +1686,9 @@ Triple find_Negative_from_previous_iteration(int index_positive){
 
 	return res;
 }
-
+/*
+	function to find an entity with cosine similarity (of the embedding) <0
+*/
 int find_not_similar(int entity){
 	int substitute=rand_max(0,entityTotal-1);
 	while(computeSimilarity(getEmbeddingforEntity(entity),getEmbeddingforEntity(substitute))>0){

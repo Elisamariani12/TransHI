@@ -22,6 +22,7 @@ def score(h,t,r):
     return (-np.linalg.norm(res,1))
 
 def main(files_src, note, number_iter):
+    #load embeddings entities
     global entity
     global relation
     global inconsistent_wrongly_classified
@@ -34,6 +35,7 @@ def main(files_src, note, number_iter):
         entity.append(sub_mat)
     entity = np.array(entity)
 
+    #load embeddings relations
     file_in = open(files_src + 'relation2vec'+note+'.vec', 'r')
     for line in file_in:
         x=line.split()
@@ -43,7 +45,7 @@ def main(files_src, note, number_iter):
         relation.append(sub_mat)
     relation = np.array(relation)
 
-    #ritrovare il valore delta per ogni relazione r : taking as threshold the minimum score in the train set of triples (maximum 40 consideredd) with that relation
+    #find delta for each relation r: taking as threshold the minimum score in the train set of triples (maximum 1000 considered for efficiency) with that relation
     train=[]
     file_in = open(files_src + 'train2id_Consistent_withAugmentation.txt', 'r')
     first_line = True
@@ -69,10 +71,11 @@ def main(files_src, note, number_iter):
     fpr_o = []
 
     for i in range(1):
-        #random.shuffle(train)
         num_rel = len(relation)
         delta_r = []
         fail = 0
+
+        #establish a threshold for each relation (and save in delta_r) looking at the scores of 1000 triples of the trainset 
         for i in range(0,num_rel):
             delta_min = -0.75
             min = delta_min
@@ -86,17 +89,16 @@ def main(files_src, note, number_iter):
                     temp = score(val[0], val[1], val[2])
                     if(temp<min): min = temp
             if(num > 0):
-                #print("the minimum score of this rel in the train DS is: " + str(min)) + " and I include an error of " + str(min * error)))
                 delta_r.append(float(min))
             else:
                 fail += 1
                 delta_r.append(float(delta_min))
 
-        #test
+        # (not needed in TransHI but needed if we want to check the accuracy/precision/recall of the classification) - classification of test triples (should be classified as +)
         test_file = files_src + 'test2id_Consistent.txt'
         result=[]
         file_in = open(test_file, 'r')
-        first_line = True   #salto prima riga, contiene numero di triple
+        first_line = True   #skip first row, it contains the number of triples
         num_test = 0
         for line in file_in:
             if(first_line):
@@ -109,16 +111,17 @@ def main(files_src, note, number_iter):
                 triple=[]
                 for val in x:
                     triple.append(int(val))
-                res = score(triple[1], triple[2], triple[3]);
+                res = score(triple[1], triple[2], triple[3])
                 if(res >= delta_r[triple[3]]):
                     result.append(1)  #TRUE POSITIVES
                 else:
                     result.append(0)  #FALSE NEGATIVES
 
+        # (needed in TransHI) - classification of inconsistent triples (should be classified as -)
         test_file = files_src + 'InconsistentTriples_'+str(number_iter)+'.txt'
         f_result=[]
         file_in = open(test_file, 'r')
-        first_line = False   #salto prima riga, contiene numero di triple
+        first_line = False   #skip first row, it contains the number of triples
         num_neg = 0
         for line in file_in:
             if(first_line):
@@ -140,20 +143,20 @@ def main(files_src, note, number_iter):
 
         print(len(result))
         print(len(f_result))
+        # (not needed in TransHI but needed if we want to check the accuracy/precision/recall of the classification) - compute eval metrics
         acc_o.append((result.count(1)+f_result.count(1))/ (len(result) + len(f_result)))
         prec_o.append(result.count(1)/(result.count(1)+f_result.count(0)))
         rec_o.append(result.count(1)/len(result))
         fpr_o.append(f_result.count(0)/(f_result.count(0)+result.count(0)))
 
-    #print("result e lungo"+str(len(result))+" e invece result_f e lungo:"+str(len(f_result)))
+        # (not needed in TransHI but needed if we want to check the accuracy/precision/recall of the classification) - write eval metrics results in file
     with open(files_src+"result_classification"+note+".txt", "a") as myfile:
         myfile.write("tc_accuracyL.append(" + str(np.mean(acc_o)) + ")\n")
         myfile.write("tc_precision.append(" + str(np.mean(prec_o)) + ")\n")
         myfile.write("tc_recall.append(" + str(np.mean(rec_o)) + ")\n")
         myfile.write("tc_FPR.append(" + str(np.mean(fpr_o)) + ")\n")
 
-
-    # Stampa le triple classificate in modo scorretto nel file "inconsistent_wrongly_classified".txt"
+        #  write misclassified triples in file
     with open(files_src+"inconsistent_wrongly_classified.txt", "w") as outfile:
         print("Found "+str(len(inconsistent_wrongly_classified))+"classified in the wrong way");
         outfile.write(str(len(inconsistent_wrongly_classified))+"\n")

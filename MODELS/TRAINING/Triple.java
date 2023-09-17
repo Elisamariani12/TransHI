@@ -1,3 +1,6 @@
+/*
+useful class to work with triples where head, tail and relation are strings
+ */
 public class Triple {
     private final String subject;
     private final String predicate;

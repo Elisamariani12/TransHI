@@ -18,8 +18,7 @@ import java.util.stream.Collectors;
 public class Axiom_entailment {
     public static final String typeOf = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>";
 
-    public static String folder_path; //="C:/Users/elisa/Desktop/ToUpload_COLAB_FILES/allfilestoRun-NELL/";
-    //"C:/Users/elisa/Desktop/ToUpload_COLAB_FILES/allfilestoRun-YAGO/";      //to run it in intellij is GENERATOR-MATERIAL/
+    public static String folder_path;
 
     public static void main(String[] args) throws Exception {
         folder_path=args[0];
@@ -79,14 +78,6 @@ public class Axiom_entailment {
         create_List(axioms_SetString,set_of_irreflexiveproperties,"IrreflexiveObjectProperty");
         create_List(axioms_SetString,set_of_asymmetricproperties,"AsymmetricObjectProperty");
 
-        System.out.println("disjoint classes:"+dictionary_of_disjointclasses.size());
-        System.out.println("equivalent classes:"+dictionary_of_equivalentClasses.size());
-        System.out.println("sub classes:"+dictionary_of_subclasses.size());
-        System.out.println("inverse prop:"+dictionary_of_inverseproperties.size());
-        System.out.println("eq prop:"+dictionary_of_equivalentproperties.size());
-        System.out.println("sub prop:"+dictionary_of_subproperties.size());
-        System.out.println("irreflexive prop:"+set_of_irreflexiveproperties.size());
-        System.out.println("asymmetric prop:"+set_of_asymmetricproperties.size());
 
         //-------------------------------STEP 0 --------------------------------------------------------------------------
         //APPLY REFLECTIVENESS FOR DISJOINTWITH,EQUIVALENTCLASSES,INVERSE PROPERTIES, EQUIVALENT PROPERTIES
@@ -118,7 +109,7 @@ public class Axiom_entailment {
         DisjORInverse_and_subkind(dictionary_of_inverseproperties,dictionary_of_subproperties);
         System.out.println("completed step 2");
 
-        /*------------------------------ STEP 3 : DOMAIN&RANGE AXIOMS entailmemts -------------------------------------------*/
+        /*------------------------------ STEP 3 : DOMAIN&RANGE AXIOMS entailmemts (Added to the set of axioms and not the dictionaries like the others) -------------------------------------------*/
         AddAxioms_Domain_SubClasses_EquivalentClasses(axioms_SetString,dictionary_of_equivalentClasses,dictionary_of_subclasses);
         AddAxioms_Range_SubClasses_EquivalentClasses(axioms_SetString,dictionary_of_equivalentClasses,dictionary_of_subclasses);
         System.out.println("completed step 3");
@@ -154,6 +145,12 @@ public class Axiom_entailment {
 
 
     //------------- step 0 functions --------------------------------------------------------------------------------
+    /*
+    FUNCTION to create a dictionary for each type of axiom.
+    input 1: set of all the axioms of the ontology
+    input 2: dictionary to fill with the wanted axioms
+    input 3: type of axioms taken into consideration
+     */
     private static void createDictionary(Set<String> axioms_set, Map<String, Set<String>> dictionary, String axiom_type) {
         String substr;
         Matcher matcher;
@@ -162,18 +159,21 @@ public class Axiom_entailment {
         List<String> classes_in_the_axiom=new ArrayList<String>();
         Set<String> instances;
 
+        //for all the axioms in the ontology
         for (String a  : axioms_set) {
             index = 0;
             substr = a.substring(0, a.indexOf("("));
+
+            //see if they are of the type taken into consideration (axiom_type)
             if (substr.equals(axiom_type)) {
                 matcher = pattern.matcher(a);
                 while (matcher.find()) {
                     classes_in_the_axiom.add(index, matcher.group(1));
                     index++;
                 }
+
+                //add to the dictionary the axiom
                 if(classes_in_the_axiom.size()>1) {
-                    //if ((map_IDs_entities.keySet().contains("<"+classes_in_the_axiom.get(1)+">") || map_IDs_relations.keySet().contains("<"+classes_in_the_axiom.get(1)+">"))
-                    //    && (map_IDs_entities.keySet().contains("<"+classes_in_the_axiom.get(0)+">") || map_IDs_relations.keySet().contains("<"+classes_in_the_axiom.get(0)+">"))) {
                     instances = dictionary.get(classes_in_the_axiom.get(1));
                     if (instances != null) {
                         instances.add(classes_in_the_axiom.get(0));
@@ -182,13 +182,19 @@ public class Axiom_entailment {
                         newLineInTheDictionary.add(classes_in_the_axiom.get(0));
                         dictionary.put(classes_in_the_axiom.get(1), newLineInTheDictionary);
                     }
-                    //}
                 }
 
             }
             classes_in_the_axiom.clear();
         }
     }
+
+    /*
+    FUNCTION to create two lists: one of all the relations that are irreflexive and one for those that are asymmetric
+    input 1: set of all the axioms of the ontology
+    input 2: list to fill with the wanted axioms
+    input 3: type of axioms taken into consideration
+     */
     private static void create_List(Set<String> axioms_set, Set<String> set_to_fill, String axiom_type) {
         String substr;
         Matcher matcher;
@@ -197,15 +203,21 @@ public class Axiom_entailment {
         List<String> classes_in_the_axiom=new ArrayList<String>();
         Set<String> instances;
 
+        //for all the axioms in the ontology
+
         for (String a  : axioms_set) {
             index = 0;
             substr = a.substring(0, a.indexOf("("));
+            //see if they are of the type taken into consideration (axiom_type)
+
             if (substr.equals(axiom_type)) {
                 matcher = pattern.matcher(a);
                 while (matcher.find()) {
                     classes_in_the_axiom.add(index, matcher.group(1));
                     index++;
                 }
+                //add to the list the axiom
+
                 if(classes_in_the_axiom.size()>0) {
                     set_to_fill.add(classes_in_the_axiom.get(0));
                 }
@@ -214,6 +226,12 @@ public class Axiom_entailment {
             classes_in_the_axiom.clear();
         }
     }
+
+    /*
+    FUNCTION to insert in the dictionaries new axioms derived with the entailments of the type:
+    if x-rel.->y then y-rel.->x
+    e.g. if x-Disj.Class->y then y-Disj.Class->x
+     */
     private static void ApplySymmetry(Map<String, Set<String>> dictionary) {
         int new_additions=0;
         Map<String,Set<String>> dictionary_copy=new HashMap<>(dictionary);
@@ -221,6 +239,8 @@ public class Axiom_entailment {
         do{
             new_additions=0;
             Map<String,Set<String>> dictionary_temp=new HashMap<>(dictionary_copy);
+
+            //for every entry in the dictionary, if the reflexive axioms is not already contained, add it
             for(String key:dictionary_copy.keySet()){
                 for(String value:dictionary_copy.get(key)){
                     if(!dictionary_temp.containsKey(value)){
@@ -235,6 +255,12 @@ public class Axiom_entailment {
         dictionary.clear();
         dictionary.putAll(dictionary_copy);
     }
+
+    /*
+    FUNCTION to insert in the dictionaries new axioms derived with the entailments of the type:
+    if x-rel.->y and y-rel.->z then x-rel.->z
+    e.g. if x-subClass->y and y-subClass->z then x-subClass->z
+     */
     private static void ApplyTransitiveClosure(Map<String, Set<String>> dictionary) {
         int new_additions = 0;
         Map<String, Set<String>> dictionary_copy = new HashMap<>(dictionary);
@@ -243,6 +269,7 @@ public class Axiom_entailment {
             new_additions = 0;
             Map<String, Set<String>> tempAdditions = new HashMap<>();
 
+            //for every entry add the new entailed axiom
             for (String key : dictionary_copy.keySet()) {
                 for (String value : dictionary_copy.get(key)) {
                     if (dictionary_copy.containsKey(value)) {
@@ -266,10 +293,20 @@ public class Axiom_entailment {
     }
 
     //------------ step 1 functions ---------------------------------------------------------------------------------
+    /*
+    FUNCTION to entail the two axioms:
+        1) if x-subclass->y and y-equiv.class->z then x-subclass->z
+        2) if x-subclass->y and x-equiv.class->z then z-subclass->y
+     and the same for subproperties!
+    input 1) dictionary containing the axioms of subclass/subproperties
+    input 2) dictionary containing the axioms of equivalent class/ properties
+     */
     private static void Subkind_and_equivalence(Map<String, Set<String>> dictionaryOfSubkind, Map<String, Set<String>> dictionaryOfEquivalents) {
         Map<String, Set<String>> dictionary_copy = new HashMap<>(dictionaryOfSubkind);
         int new_additions;
 
+
+        //AXIOMS ENTAILED: if x-subclass->y and y-equiv.class->z then x-subclass->z
         do {
             new_additions = 0;
             Map<String, Set<String>> dictionarytemp = new HashMap<>(dictionary_copy);
@@ -301,6 +338,7 @@ public class Axiom_entailment {
         ApplyTransitiveClosure(dictionaryOfSubkind);
         dictionary_copy = new HashMap<>(dictionaryOfSubkind);
 
+        //AXIOMS ENTAILED: if x-subclass->y and x-equiv.class->z then z-subclass->y
         do {
             new_additions = 0;
             ApplyTransitiveClosure(dictionary_copy);
@@ -330,6 +368,12 @@ public class Axiom_entailment {
 
 
     //------------ step 2 functions ---------------------------------------------------------------------------------
+    /*
+    FUNCTION to entail the axiom:
+        1)  IF X IS DISJOINT-WITH/inverseOf Y and Y IS EQUIVALENT TO Z, X IS DISJOINT-WITH/
+    input 1) dictionary containing the axioms of disjjointwith/inverseof
+    input 2) dictionary containing the axioms of equivalent class/ properties
+     */
     private static void DisjORInverse_and_equivalence(Map<String, Set<String>> dictionary, Map<String, Set<String>> dictionaryOfEquivalents) {
         int new_additions=0;
         Map<String, Set<String>> dictionary_copy = new HashMap<>(dictionary);
@@ -352,6 +396,12 @@ public class Axiom_entailment {
         dictionary.clear();
         dictionary.putAll(dictionary_copy);
     }
+    /*
+    FUNCTION to entail the axiom:
+        1)  IF X IS DISJOINT-WITH/inverseOf Y and Z IS subclass/subprop TO X, Z IS DISJOINT-WITH/inverseof Y
+    input 1) dictionary containing the axioms of disjjointwith/inverseof
+    input 2) dictionary containing the axioms of sub classes/ properties
+     */
     private static void DisjORInverse_and_subkind(Map<String, Set<String>> dictionary, Map<String, Set<String>> dictionaryOfSubkind) {
         int new_additions=0;
         Map<String, Set<String>> dictionary_copy = new HashMap<>(dictionary);
@@ -378,6 +428,15 @@ public class Axiom_entailment {
     }
 
     // ----------- step 3 functions ------------------------------------------------------------------------------
+    /*
+    FUNCTION to entail the axiom:
+        1)  IF X is in domain of R and x IS subclass TO Y, Y is in domain of R
+        1)  IF X is in domain of R and x IS equivclass TO Y, Y is in domain of R
+    input 1) set of all the axioms
+    input 2) dictionary containing the axioms of equiv classes
+    input 3) dictionary containing the axioms of sub classes
+    The entailed axioms are added to the set of all the axioms
+     */
     private static void AddAxioms_Domain_SubClasses_EquivalentClasses(Set<String> axioms_set, Map<String, Set<String>> dictionary_of_equivalentClasses, Map<String, Set<String>> dictionary_of_subclasses) {
 
         String substr;
@@ -427,6 +486,15 @@ public class Axiom_entailment {
         //System.out.println(newAxioms);
         axioms_set.addAll(newAxioms);
     }
+    /*
+    FUNCTION to entail the axiom:
+        1)  IF X is in range of R and x IS subclass TO Y, Y is in range of R
+        1)  IF X is in range of R and x IS equivclass TO Y, Y is in range of R
+    input 1) set of all the axioms
+    input 2) dictionary containing the axioms of equiv classes
+    input 3) dictionary containing the axioms of sub classes
+     The entailed axioms are added to the set of all the axioms
+     */
     private static void AddAxioms_Range_SubClasses_EquivalentClasses(Set<String> axioms_set, Map<String, Set<String>> dictionary_of_equivalentClasses, Map<String, Set<String>> dictionary_of_subclasses) {
 
         String substr;
@@ -477,7 +545,12 @@ public class Axiom_entailment {
     }
 
     // ----------- step 4 functions ------------------------------------------------------------------------------
-
+    /*
+    FUNCTION to entail the axiom:
+        1)  IF p is asymm/irreflex p2 IS equiv.prop TO p, p2 is asymm/irreflex
+    input 1) list containing the asymm/irreflex properties
+    input 2) dictionary containing the axioms of equiv classes
+     */
     private static void IrreflexORAsymm_and_equivalence(Set<String> setOfAsymmOrIrreflproperties, Map<String, Set<String>> dictionaryOfEquivalentClasses) {
         for(String s:setOfAsymmOrIrreflproperties){
             if(dictionaryOfEquivalentClasses.containsKey(s)){
@@ -487,7 +560,12 @@ public class Axiom_entailment {
             }
         }
     }
-
+    /*
+       FUNCTION to entail the axiom:
+           1)  IF p is asymm/irreflex p2 IS subprop TO p, p2 is asymm/irreflex
+       input 1) list containing the asymm/irreflex properties
+       input 2) dictionary containing the axioms of subprop
+        */
     private static void IrreflexORAsymm_and_subprop(Set<String> setOfAsymmORIrreflproperties, Map<String, Set<String>> dictionaryOfSubproperties) {
         for(String s:setOfAsymmORIrreflproperties){
             if(dictionaryOfSubproperties.containsKey(s)){
@@ -498,6 +576,9 @@ public class Axiom_entailment {
         }
     }
     // ----------- step 5 functions ------------------------------------------------------------------------------
+     /*
+    FUNCTION to link an entity to all its superclasses. It's the opposite of the dictionary_of_sub where each entity is linked to all its subclasses
+     */
     public static void createDictionary_of_super(Map<String, Set<String>> dictionary_of_sub, Map<String, Set<String>> dictionary_of_sup) {
         for (Map.Entry<String, Set<String>> entry : dictionary_of_sub.entrySet()) {
             for (String subclass : entry.getValue()) {
@@ -532,6 +613,13 @@ public class Axiom_entailment {
         }
         bw.close();
     }
+    /*
+   FUNCTION to extract the domain/range axioms from the set of all the axioms (that contain the entailed ones) and convert them into their IDs version instead of ttl
+    input 1) set of the axioms domain/range
+    input 2) set of all the axioms
+    input 3) map of the entities in strings and their IDs
+    input 4) map of the relations in strings and their IDs
+    */
     private static HashMap<Integer,Set<Integer>> extractAxioms_rel_entity(String type_axiom_string, Set<String> axioms_setString,Map<String,Integer> map_IDs_relations, Map<String,Integer> map_IDs_entities) {
         String substr;
         Pattern pattern = Pattern.compile("<([^>]*)>");

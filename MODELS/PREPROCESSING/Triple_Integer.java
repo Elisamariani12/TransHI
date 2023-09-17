@@ -1,4 +1,6 @@
-
+/*
+useful class to work with triples where head, tail and relation are their numeric IDs
+ */
 public class Triple_Integer {
     private final Integer subject;
     private final Integer predicate;
