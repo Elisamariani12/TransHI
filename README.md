@@ -9,7 +9,7 @@ the self-correct training. To assess TransHySeCo, we conducted numerous experime
 
 The TransHySeCo's pipeline is depicted:
 
-![TransHI's framework]([https://github.com/Elisamariani12/TransHI/blob/23615642c29334c09d8f1a020b1ffb2d448d9877/images/framework.jpg](https://github.com/Elisamariani12/TransHySeCo/blob/main/images/framework.jpg))
+![TransHI's framework](https://github.com/Elisamariani12/TransHySeCo/blob/main/images/framework.jpg)
 
 Given a KG and its corresponding ontology, the pipeline devised by TransHI can be segmented into:
 - **Preprocessing phase:**
