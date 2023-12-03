@@ -1,9 +1,9 @@
-# TransHI
-### An Iterative Pipeline for Embedding Knowledge Graphs.
+# TransHySeCo
+### A Hybrid Self-Correcting Approach for Embedding Knowledge Graphs.
 
-This repository pertains to my thesis, the objective of which is to devise a new method for embedding knowledge graphs (KGs). The method conceived is termed "TransHI", which is an iterative pipeline that incorporates not only an innovative training algorithm but also a pre-processing phase and a mechanism to generate varied training data for use across multiple iterations of the pipeline. Specifically, the training algorithm introduces the "hybrid" aspect of this approach: negative triples are generated based either on structure or on ontological knowledge. This approach became imperative as ontologies might not cover information related to all entities and relationships within the graph. A hybrid strategy that amalgamates both ontological insights and structural aspects permits a more comprehensive utilization of the KG’s data.
-
-The creation of TransHI, particularly its training algorithm, was inspired by the TransOWL algorithm (https://github.com/Keehl-Mihael/TransROWL-HRS). TransOWL is an embedding algorithm that leverages the ontology knowledge associated with KGs to generate negative triples. Recognizing areas for enhancement in TransOWL, a novel training algorithm was constructed.
+This repository pertains to the study conducted at the LISN laboratory of Université Paris Saclay, the objective of which is to devise a new method for embedding knowledge graphs (KGs). The method conceived is termed "TransHySeCo": a Hybrid and Self-correcting new approach for embedding knowledge graphs. TransHySeCo is based on a hybrid training to learn the KG embeddings using both the domain semantics and the topology underlying the graph structure. Moreover, it is self-correcting, generating new negative triples leveraging the embeddings from previous training iterations and (quasi-)true negatives obtained with the
+ontology-based negative generation method proposed in this paper. These new true negative triples are paired with the corresponding positive ones in a subsequent training step. The self-correction terminates when there is no new (quasi-)true negative triple generable. We define, implement and evaluate the whole framework, including the three main phases: pre-processing, training and negative triples update where the latter is a prerequisite for
+the self-correct training. To assess TransHySeCo, we conducted numerous experiments on benchmark datasets and evaluated the quality of the embeddings for link prediction purposes compared to TransE, TransOWL, TransR and TransROWL. The results position TransHySeCo as a promising solution for knowledge graph embedding.
 
 ### TransHI - overview 
 
