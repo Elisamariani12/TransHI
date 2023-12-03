@@ -5,9 +5,9 @@ This repository pertains to the study conducted at the LISN laboratory of Univer
 ontology-based negative generation method proposed in this paper. These new true negative triples are paired with the corresponding positive ones in a subsequent training step. The self-correction terminates when there is no new (quasi-)true negative triple generable. We define, implement and evaluate the whole framework, including the three main phases: pre-processing, training and negative triples update where the latter is a prerequisite for
 the self-correct training. To assess TransHySeCo, we conducted numerous experiments on benchmark datasets and evaluated the quality of the embeddings for link prediction purposes compared to TransE, TransOWL, TransR and TransROWL. The results position TransHySeCo as a promising solution for knowledge graph embedding.
 
-### TransHI - overview 
+### TransHySeCo - overview 
 
-The TransHI's pipeline is depicted:
+The TransHySeCo's pipeline is depicted:
 
 ![TransHI's framework](https://github.com/Elisamariani12/TransHI/blob/23615642c29334c09d8f1a020b1ffb2d448d9877/images/framework.png)
 
