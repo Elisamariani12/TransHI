@@ -14,7 +14,7 @@ The TransHySeCo's pipeline is depicted:
 Given a KG and its corresponding ontology, the pipeline devised by TransHySeCo can be segmented into three phases:
 - **Pre-processing phase** aims to reduce the knowledge base inconsistency. More specifically, we define a linear algorithm to remove inconsistent triples wrt. to the ontology and the knowlege graph.
 We also enrich the training subgraph using ontological entailment. This augmentation allows to generate new positive triples exploiting domain knowledge.
-- **Training phase** aims to learn the KG embedding with positive training triples and negative training triples, minimizing a loss function L. The generation of negative triples is initially performed in a hybrid mode: starting from the positive ones, exploiting both the KG structure and the domain ontology. For the self-correct training, the positives samples are paired with the negative samples discovered in the Negative Triples Update phase.
+- **Training phase** aims to learn the KG embedding with positive training triples and negative training triples, minimizing a loss function L. The generation of negative triples is initially performed in a hybrid mode: starting from the positive ones, exploiting both the KG structure and the domain ontology. For the self-correct training, the positives samples are paired with the negative samples discovered in the Negative Triples Update phase.
 - **Negative Triples Update phase** prepares new negative triples to be used during the self-correct training by exploiting the embeddings created in the previous training and a triple classification task defined in TransHySeCo.
 
 
