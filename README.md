@@ -22,7 +22,7 @@ We also enrich the training subgraph using ontological entailment. This augmenta
 
 In the table below, the performance of TransHI is compared to that of TransE, TransOWL, TransR and TransROWL. Their quality was assessed in the link prediction task.
 
-![TransHI's results](https://github.com/Elisamariani12/TransHI/blob/df79e995bef58a9771070160827bc8a1d8f4c743/images/summary_table.png)
+![TransHySeCo's results]()
 
 It can be observed that the best iteration of TransHI outperforms TransE and TransOWL for the considered datasets: DBPEDIA15K, YAGO, and NELL. Alongside the final result of TransHI (that of the best performance), one can also view, for comparison, the outcomes of TransE and TransOWL using preprocessed data (with preprocessing provided by TransHI). Additionally, the results from the individual use of negative triples generated based on structure and those based on ontology are displayed, as well as the outcomes of TransHI after just a single iteration.
 
