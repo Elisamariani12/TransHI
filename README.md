@@ -11,24 +11,16 @@ The TransHySeCo's pipeline is depicted:
 
 ![TransHI's framework](https://github.com/Elisamariani12/TransHySeCo/blob/main/images/framework.jpg)
 
-Given a KG and its corresponding ontology, the pipeline devised by TransHI can be segmented into:
-- **Preprocessing phase:**
-    - **Inconsistencies Correction:** To identify and remove inconsistencies in the KG.
-    - **Axioms Entailment:** New axioms are entailed from the ones contained in the ontology.
-    - **Positive Triples Augmentation:** New positive triples are entailed from the KG and the ontology.
-        
-- **Training phase:** 
-    - The KG embeddings are learned using a novel training algorithm. The method to create negatives is different in the first iteration with respect to the following ones.
+Given a KG and its corresponding ontology, the pipeline devised by TransHySeCo can be segmented into three phases:
+- **Pre-processing phase** aims to reduce the knowledge base inconsistency. More specifically, we define a linear algorithm to remove inconsistent triples wrt. to the ontology and the knowlege graph.
+We also enrich the training subgraph using ontological entailment. This augmentation allows to generate new positive triples exploiting domain knowledge.
+- **Training phase** aims to learn the KG embedding with positive training triples and negative training triples, minimizing a loss function L. The generation of negative triples is initially performed in a hybrid mode: starting from the positive ones, exploiting both the KG structure and the domain ontology. For the self-correct training, the positives samples are paired with the negative samples discovered in the Negative Triples Update phase.
+- **Negative Triples Update phase** prepares new negative triples to be used during the self-correct training by exploiting the embeddings created in the previous training and a triple classification task defined in TransHySeCo.
 
-- **Training Data Update phase:**
-    - **Inconsistent Triples Generation:** A set of inconsistent triples is generated using the KG and the ontology.
-    - **Triple Classification:** The embeddings learned in the previous training are used to classify the generated inconsistent triples as positives or negatives.
 
-The misclassified triples obtained with the classification are used as negative triples in a new training phase. The latter will be followed by yet another update phase, in an iterative manner. The process stops when, in the "Training Data Update" phase, there are no new inconsistent triples that can be generated, or when no triple is misclassified.
+### TransHySeCo - Link prediction performances
 
-### TransHI - Link prediction performance
-
-In the table below, the performance of TransHI is compared to that of TransOWL, as TransOWL was the primary algorithm targeted for improvement, and to TransE, a cornerstone among translational embedding algorithms. Their quality was assessed in the link prediction task.
+In the table below, the performance of TransHI is compared to that of TransE, TransOWL, TransR and TransROWL. Their quality was assessed in the link prediction task.
 
 ![TransHI's results](https://github.com/Elisamariani12/TransHI/blob/df79e995bef58a9771070160827bc8a1d8f4c743/images/summary_table.png)
 
@@ -48,7 +40,7 @@ for the three KGs:
 - NELL: 5,000 random walks;
 These choices were informed by the quantity of neighbors required for training.
 
-### TransHI - Instructions
+### TransHySeCo - Instructions
 
 Instructions for executing the TransHI pipeline are provided. Specifically, the relevant codes are located in the MODELS folder and are divided into the three main phases of the pipeline: PREPROCESSING, TRAINING, and TRAINING_DATA_UPDATE.
 
