@@ -26,6 +26,10 @@ In the table below, the performance of TransHySeCo is compared to that of TransE
 
 It can be observed that the best iteration of TransHySeCo outperforms the other algorithms for the considered datasets: DBPEDIA15K, YAGO, and NELL. Alongside the final result of TransHySeCo (that of the best performance), one can also view, for comparison, the outcomes of TransE, TransOWL, TransR and TransROWL using preprocessed data (with preprocessing provided by TransHySeCo). Additionally, the results from the individual use of negative triples generated based on structure and those based on ontology are displayed, as well as the outcomes of TransHySeCo after just a single iteration and the ones obtained without the order based on CC.
 
+In the table below, the performances of TransRHySeCo are presented. TransRHySeCo is the algorithm obtained by applying TransR by but initializing the embeddings with TransHySeCo, as opposed to the conventional initialization method that uses TransE. The comparison between TransHySeCo and TransRHySeCo helps in demonstrating the embeddings ability of modeling complex relations. 
+
+![TransRHySeCo's results](https://github.com/Elisamariani12/TransHySeCo/blob/main/images/TransRHySeCo.png)
+
 Standard parameters commonly employed in the literature were used to enable a fair comparison of the approaches under identical conditions. The chosen parameters include a learning rate of 0.001, 1000 epochs, an embedding dimension of 100, and a margin γ = 1. Two extra parameters, associated with the training employed by TransHySeCo, pertain to the process of identifying entity neighbors. A choice of k = 3 hops was made, and varying numbers of random walks were used for the three KGs: DBPEDIA15k with 10,000 random walks, YAGO with 3,000 random walks, and NELL with 5,000 random walks. These choices were informed by the quantity of neighbors required for training and will be discussed in Section VII-C.
 
 
@@ -155,4 +159,15 @@ g++ -std=c++11 LinkPrediction_noTypeOf.cpp -o LinkPrediction_noTypeOf.exe -pthre
    ```
 
  <small>*N.B. In this example the embeddings evaluated were created with 10% of the negatives.*</small>
+
+
+### TransRHySeCo - Instructions
+
+**TRAINING - Instructions**
+g++ -std=c++11 TransRHI.cpp -o TransRHI.exe -pthread
+
+./TransRHI.exe -number_iteration 1 -percentage_negatives_generated 0 -use_ontology false -use_structure false -input ~/DBPEDIA/ -output ~/DBPEDIA/ -note "_10_R"
+
+g++ -std=c++11 LinkPredictionR.cpp -o LinkPredictionR.exe -pthread -O3 -march=native
+
 
