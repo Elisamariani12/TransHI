@@ -9,7 +9,7 @@ the self-correct training. To assess TransHySeCo, we conducted numerous experime
 
 The TransHySeCo's pipeline is depicted:
 
-![TransHI's framework](https://github.com/Elisamariani12/TransHySeCo/blob/main/images/framework.jpg)
+![TransHySeCo's framework](https://github.com/Elisamariani12/TransHySeCo/blob/main/images/framework.jpg)
 
 Given a KG and its corresponding ontology, the pipeline devised by TransHySeCo can be segmented into three phases:
 - **Pre-processing phase** aims to reduce the knowledge base inconsistency. More specifically, we define a linear algorithm to remove inconsistent triples wrt. to the ontology and the knowlege graph.
@@ -20,29 +20,18 @@ We also enrich the training subgraph using ontological entailment. This augmenta
 
 ### TransHySeCo - Link prediction performances
 
-In the table below, the performance of TransHI is compared to that of TransE, TransOWL, TransR and TransROWL. Their quality was assessed in the link prediction task.
+In the table below, the performance of TransHySeCo is compared to that of TransE, TransOWL, TransR and TransROWL. Their quality was assessed in the link prediction task.
 
 ![TransHySeCo's results](https://github.com/Elisamariani12/TransHySeCo/blob/main/images/summary_table.png)
 
-It can be observed that the best iteration of TransHI outperforms TransE and TransOWL for the considered datasets: DBPEDIA15K, YAGO, and NELL. Alongside the final result of TransHI (that of the best performance), one can also view, for comparison, the outcomes of TransE and TransOWL using preprocessed data (with preprocessing provided by TransHI). Additionally, the results from the individual use of negative triples generated based on structure and those based on ontology are displayed, as well as the outcomes of TransHI after just a single iteration.
+It can be observed that the best iteration of TransHySeCo outperforms the other algorithms for the considered datasets: DBPEDIA15K, YAGO, and NELL. Alongside the final result of TransHySeCo (that of the best performance), one can also view, for comparison, the outcomes of TransE, TransOWL, TransR and TransROWL using preprocessed data (with preprocessing provided by TransHySeCo). Additionally, the results from the individual use of negative triples generated based on structure and those based on ontology are displayed, as well as the outcomes of TransHySeCo after just a single iteration and the ones obtained without the order based on CC.
 
-The results for these experiments were obtained choosing the best percentage of random triples among various tries (percentages from 10 to 100 by tens). All the results related to these tries are contained in the folder "images". The parameter settings are the standard ones:
-- learning rate: 0.001
-- epochs: 1000
-- embedding dimension: 100
-- margin: 1 
+Standard parameters commonly employed in the literature were used to enable a fair comparison of the approaches under identical conditions. The chosen parameters include a learning rate of 0.001, 1000 epochs, an embedding dimension of 100, and a margin γ = 1. Two extra parameters, associated with the training employed by TransHySeCo, pertain to the process of identifying entity neighbors. A choice of k = 3 hops was made, and varying numbers of random walks were used for the three KGs: DBPEDIA15k with 10,000 random walks, YAGO with 3,000 random walks, and NELL with 5,000 random walks. These choices were informed by the quantity of neighbors required for training and will be discussed in Section VII-C.
 
-Two additional parameters, associated with the training employed by TransHI, pertain to the process of identifying entity
-neighbors. A choice of k = 3 hops was made, and varying numbers of random walks were used
-for the three KGs:
-- DBPEDIA15k: 10,000 random walks;
-- YAGO: 3,000 random walks;
-- NELL: 5,000 random walks;
-These choices were informed by the quantity of neighbors required for training.
 
 ### TransHySeCo - Instructions
 
-Instructions for executing the TransHI pipeline are provided. Specifically, the relevant codes are located in the MODELS folder and are divided into the three main phases of the pipeline: PREPROCESSING, TRAINING, and TRAINING_DATA_UPDATE.
+Instructions for executing the TransHySeCo pipeline are provided. Specifically, the relevant codes are located in the MODELS folder and are divided into the three main phases of the pipeline: Pre-processing, Training, and Negative Triples Update.
 
 Within the folders dedicated to the 3 KGs (DBPEDIA15K, YAGO, NELL), one can find specific files tailored for each KG. Before initiating the pipeline, one must choose a particular KG; all subsequent steps will utilize files contained within the chosen KG's folder.
 
@@ -50,7 +39,7 @@ In the training algorithm, triples are not employed as strings but rather as seq
 
 **PREPROCESSING - Instructions**
 
-The initial two steps of this phase utilize an ontological reasoner, Hermit (http://www.hermit-reasoner.com/java.html), to work with ontologies. The two JAR files related to this reasoner, as used in TransHI, can be found in the 'MODELS/PREPROCESSING/' directory. To execute the commands provided below accurately, one should place the JAR files in the same directory where the programs to be run are located.
+The initial two steps of this phase utilize an ontological reasoner, Hermit (http://www.hermit-reasoner.com/java.html), to work with ontologies. The two JAR files related to this reasoner, as used in TransHySeCo, can be found in the 'MODELS/PREPROCESSING/' directory. To execute the commands provided below accurately, one should place the JAR files in the same directory where the programs to be run are located.
 
 1. Inconsistencies correction
 
@@ -69,7 +58,7 @@ The initial two steps of this phase utilize an ontological reasoner, Hermit (htt
    
     java IDtoTTLconverter "/path_to_valid2id/" "valid2id.txt"
    ```
-- Remove Inconsitencies - The file "complete_graph" has to be in the same folder as the files "train.txt","test.txt","valid.txt". This step clean the complete graph from the inconsistencies and then split the triples based on the division done by the authors of TransOWL (https://github.com/Keehl-Mihael/TransROWL-HRS). The files with the consistent triples produced are: "consistent_triples_train.txt", "consistent_triples_test.txt", "consistent_triples_valid.txt".
+- Remove Inconsitencies - The file "complete_graph" has to be in the same folder as the files "train.txt", "test.txt", "valid.txt". This step clean the complete graph from the inconsistencies and then split the triples based on the division done by the authors of TransOWL (https://github.com/Keehl-Mihael/TransROWL-HRS). The files with the consistent triples produced are: "consistent_triples_train.txt", "consistent_triples_test.txt", "consistent_triples_valid.txt".
 ```bash
    javac -cp ./:./org.semanticweb.HermiT.jar:./HermiT.jar InconsistencyCorrection.java
    java -cp ./:./org.semanticweb.HermiT.jar:./HermiT.jar InconsistencyCorrection "/path_to_ontology_file_complete_graph/" "/path_to_ontology/ontology_file.ttl"
@@ -113,8 +102,8 @@ javac NeighborsGenerator.java
  ```
 - Training algorithm -  The first parameter indicates the current iteration number. The second parameter, "percentage_negatives_generated," represents the percentage of negatives generated either by leveraging ontological knowledge or the structure. The "use_ontology" parameter should be set to true if one wishes to use ontology-based negative triples. The same applies to the "use_structure" parameter. All input files must reside in the same directory ("path_to_files"), "path_to_files", and these files include: relation2id.txt, entity2id.txt, train2id_Consistent_withAugmentation.txt, DisjointWith_axioms.txt, Domain_axioms.txt, Range_axioms.txt, SuperClasses_axioms.txt, IrreflexiveProperties_axioms.txt, AsymmetricProperties_axioms.txt, file_Neighbors.txt, and CCs.txt. The training output yields the embeddings of entities and relationships, saved in the files: relation2vec.vec and entity2vec.vec. To differentiate the embeddings generated under various settings, one can append a string to "entity2vec" and "relation2vec" using the 'note' parameter.
   ```bash
-  g++ -std=c++11 TransHI.cpp -o TransHI.exe -pthread
-  ./TransHI.exe -number_iteration 1 -percentage_negatives_generated 10 -use_ontology false -use_structure true -input ~/path_to_files/ -output ~/c/ -note "_10_onlyS"
+  g++ -std=c++11 TransHySeCo.cpp -o TransHySeCo.exe -pthread
+  ./TransHySeCo.exe -number_iteration 1 -percentage_negatives_generated 10 -use_ontology false -use_structure true -input ~/path_to_files/ -output ~/c/ -note "_10_onlyS"
    ```
   <small>*N.B. In this example 10% of the negatives triples are create using only the structure.*</small>
 
@@ -138,7 +127,7 @@ python3 triple_classification.py "_10_onlyS" "/path_to_files/" "1"
 
 7. Training algorithm -next iterations - The first parameter indicates the current iteration number. The second parameter, "percentage_negatives_generated" should be set at 100 because in the iterations following the first one all the misclassified triples are to be used. All input files must reside in the same directory ("path_to_files"), "path_to_files", and these files include: relation2id.txt, entity2id.txt, train2id_Consistent_withAugmentation.txt, inconsistent_wrongly_classified.txt and the files of the embeddings created in the previous training. The parameter "note" used in the previous training has to be used as parameter "old_note". Instead, the parameter "note" should have another label to identify the new embeddings created.
   ```bash
-  ./TransHI.exe -number_iteration 2 -percentage_negatives_generated 100 -input ~/path_to_files/ -output ~/path_to_files/ -old_note "_10_onlyS" -note "_10_onlyS_2iter"
+  ./TransHySeCo.exe -number_iteration 2 -percentage_negatives_generated 100 -input ~/path_to_files/ -output ~/path_to_files/ -old_note "_10_onlyS" -note "_10_onlyS_2iter"
    ```
 
 After the training of the iterations following the first one, another classification can follow and then another training step, in an iterative way. The pipeline stops when the file "inconsistent_wrongly_classified.txt" is empty or there are no more files "InconsistentTriples_***.txt" to use (each of them has to be used just once).
