@@ -163,11 +163,18 @@ g++ -std=c++11 LinkPrediction_noTypeOf.cpp -o LinkPrediction_noTypeOf.exe -pthre
 
 ### TransRHySeCo - Instructions
 
-**TRAINING - Instructions**
-g++ -std=c++11 TransRHI.cpp -o TransRHI.exe -pthread
+To train TransRHySeCo all input files must reside in the same directory ("path_to_files"), "path_to_files", and these files include: relation2id.txt, entity2id.txt, train2id_Consistent_withAugmentation.txt and the files with the embeddings obtained with TransHySeCo ("entity2vec_note1.vec" and "relation2vec_note1.vec" where 'note' depends on the name given to the best iteration embeddings obtained with TransHySeCo.
+The training output yields the embeddings of entities and relationships, saved in the files: relation2vec_note.vec and entity2vec_note.vec. 
+  ```bash
+g++ -std=c++11 TransRHySeCo.cpp -o TransRHySeCo.exe -pthread
+./TransRHySeCo.exe -input ~/path_to_files/ -output ~/path_to_files/ -note "_RHySeCo" -note1 "_best_iteration_note"
+   ```
+To test TransHySeCo the LinkPredictionR.cpp algorithm is used. Similarly to the LinkPrediction.cpp one, in the folder "path_to_embedding" there have to be the embeddings to be evaluated: the files entity2vec and relation2vec followed by the string indicated in "note" that identify the settings of creation of the embeddings. 
 
-./TransRHI.exe -number_iteration 1 -percentage_negatives_generated 0 -use_ontology false -use_structure false -input ~/DBPEDIA/ -output ~/DBPEDIA/ -note "_10_R"
-
+  ```bash
 g++ -std=c++11 LinkPredictionR.cpp -o LinkPredictionR.exe -pthread -O3 -march=native
+./LinkPredictionR.exe -init ~/path_to_embedding/ -input ~/path_to_embedding/ -output ~/path_to_embedding/ -note "_to_test"
+   ```
+
 
 
