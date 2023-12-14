@@ -30,6 +30,8 @@ In the table below, the performances of TransRHySeCo are presented. TransRHySeCo
 
 ![TransRHySeCo's results](https://github.com/Elisamariani12/TransHySeCo/blob/main/images/TransRHySeCo.png)
 
+The 'images' folder containes further tables detailing the results of all the tests performed.
+
 Standard parameters commonly employed in the literature were used to enable a fair comparison of the approaches under identical conditions. The chosen parameters include a learning rate of 0.001, 1000 epochs, an embedding dimension of 100, and a margin γ = 1. Two extra parameters, associated with the training employed by TransHySeCo, pertain to the process of identifying entity neighbors. A choice of k = 3 hops was made, and varying numbers of random walks were used for the three KGs: DBPEDIA15k with 10,000 random walks, YAGO with 3,000 random walks, and NELL with 5,000 random walks. These choices were informed by the quantity of neighbors required for training and will be discussed in Section VII-C.
 
 
