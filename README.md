@@ -33,10 +33,10 @@ The 'images' folder containes further tables detailing the results of all the te
 ### TransHySeCo - Parameters
 
 Standard parameters commonly employed in the literature were used to enable a fair comparison of the approaches under identical conditions. The chosen parameters include:
-- learning rate: 0.001
+- Learning rate: 0.001
 - Epochs: 1000 
-- embedding dimension: 100
-- margin γ = 1
+- Embedding dimension: 100
+- Margin γ = 1
 Two extra parameters, associated with the training employed by TransHySeCo, pertain to the process of identifying entity neighbors:
 - A choice of k = 3 hops was made:
 - Varying numbers of random walks were used for the three KGs: DBPEDIA15k with 10,000 random walks, YAGO with 3,000 random walks, and NELL with 5,000 random walks
