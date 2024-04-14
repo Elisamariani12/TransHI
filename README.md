@@ -26,13 +26,21 @@ In the table below, the performance of TransHySeCo is compared to that of TransE
 
 It can be observed that the best iteration of TransHySeCo outperforms the other algorithms for the considered datasets: DBPEDIA15K, YAGO, and NELL. Alongside the final result of TransHySeCo (that of the best performance), one can also view, for comparison, the outcomes of TransE, TransOWL, TransR and TransROWL using preprocessed data (with preprocessing provided by TransHySeCo). Additionally, the results from the individual use of negative triples generated based on structure and those based on ontology are displayed, as well as the outcomes of TransHySeCo after just a single iteration and the ones obtained without the order based on CC.
 
-In the table below, the performances of TransRHySeCo are presented. TransRHySeCo is the algorithm obtained by applying TransR by but initializing the embeddings with TransHySeCo, as opposed to the conventional initialization method that uses TransE. The comparison between TransHySeCo and TransRHySeCo helps in demonstrating the embeddings ability of modeling complex relations. 
-
-![TransRHySeCo's results](https://github.com/Elisamariani12/TransHySeCo/blob/main/images/TransRHySeCo.png)
+Also the performances of TransRHySeCo is presented. TransRHySeCo is the algorithm obtained by applying TransR by but initializing the embeddings with TransHySeCo, as opposed to the conventional initialization method that uses TransE. The comparison between TransHySeCo and TransRHySeCo helps in demonstrating the embeddings ability of modeling complex relations. 
 
 The 'images' folder containes further tables detailing the results of all the tests performed.
 
-Standard parameters commonly employed in the literature were used to enable a fair comparison of the approaches under identical conditions. The chosen parameters include a learning rate of 0.001, 1000 epochs, an embedding dimension of 100, and a margin γ = 1. Two extra parameters, associated with the training employed by TransHySeCo, pertain to the process of identifying entity neighbors. A choice of k = 3 hops was made, and varying numbers of random walks were used for the three KGs: DBPEDIA15k with 10,000 random walks, YAGO with 3,000 random walks, and NELL with 5,000 random walks. These choices were informed by the quantity of neighbors required for training and will be discussed in Section VII-C.
+### TransHySeCo - Parameters
+
+Standard parameters commonly employed in the literature were used to enable a fair comparison of the approaches under identical conditions. The chosen parameters include:
+- learning rate: 0.001
+- Epochs: 1000 
+- embedding dimension: 100
+- margin γ = 1
+Two extra parameters, associated with the training employed by TransHySeCo, pertain to the process of identifying entity neighbors:
+- A choice of k = 3 hops was made:
+- Varying numbers of random walks were used for the three KGs: DBPEDIA15k with 10,000 random walks, YAGO with 3,000 random walks, and NELL with 5,000 random walks
+Both these choices, as disccussed in the research paper, were informed by the quantity of neighbors required for training.
 
 
 ### TransHySeCo - Instructions
